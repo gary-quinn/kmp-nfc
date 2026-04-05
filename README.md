@@ -93,16 +93,17 @@ if (caps.canReadRawTag) { /* Raw transceive available */ }
 val adapter = NfcAdapter()
 
 adapter.tags(ReaderOptions(alertMessage = "Hold near tag")).collect { tag ->
-    val ndef = tag.readNdef()
-    ndef?.records?.forEach { record ->
-        when (record) {
-            is NdefRecord.Uri -> println("URL: ${record.uri}")
-            is NdefRecord.Text -> println("Text: ${record.text}")
-            is NdefRecord.MimeMedia -> println("MIME: ${record.mimeType}")
-            else -> {}
+    tag.use {
+        val ndef = it.readNdef()
+        ndef?.records?.forEach { record ->
+            when (record) {
+                is NdefRecord.Uri -> println("URL: ${record.uri}")
+                is NdefRecord.Text -> println("Text: ${record.text}")
+                is NdefRecord.MimeMedia -> println("MIME: ${record.mimeType}")
+                else -> {}
+            }
         }
     }
-    tag.close()
 }
 ```
 
@@ -176,7 +177,7 @@ Together these form the foundation for an Aliro SDK — the CSA smart lock stand
 
 ## Requirements
 
-- Kotlin 2.3.0+
+- Kotlin 2.3.20+
 - Android minSdk 33
 - iOS 15+
 - kotlinx-coroutines 1.10+

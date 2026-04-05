@@ -49,9 +49,10 @@ https://github.com/gary-quinn/kmp-nfc
 val adapter = NfcAdapter()
 
 adapter.tags(ReaderOptions(alertMessage = "Hold near tag")).collect { tag ->
-    val ndef = tag.readNdef()
-    println("Records: ${ndef?.records}")
-    tag.close()
+    tag.use {
+        val ndef = it.readNdef()
+        println("Records: ${ndef?.records}")
+    }
 }
 ```
 
