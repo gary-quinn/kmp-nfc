@@ -1,0 +1,129 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  pull-requests: write
+  pages: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      release_url: ${{ steps.release.outputs.release_url }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@39e147cb9de83bb9910b8ef8bd7fff0ee20fcd6f # v6.0.1
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Publish to Maven Central
+        run: ./gradlew publishAllPublicationsToMavenCentralRepository
+        env:
+          VERSION: ${{ github.ref_name }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Build XCFramework
+        run: ./gradlew assembleXCFramework
+        env:
+          VERSION: ${{ github.ref_name }}
+
+      - name: Zip XCFramework
+        run: |
+          cd build/XCFrameworks/release
+          zip -r KmpNfc.xcframework.zip KmpNfc.xcframework
+
+      - name: Create release and upload XCFramework
+        id: release
+        run: |
+          gh release create ${{ github.ref_name }} \
+            --title "${{ github.ref_name }}" \
+            --generate-notes 2>/dev/null || true
+          gh release upload ${{ github.ref_name }} \
+            build/XCFrameworks/release/KmpNfc.xcframework.zip \
+            --clobber
+          echo "release_url=https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Package.swift
+        run: |
+          VERSION=${{ github.ref_name }}
+          CHECKSUM=$(swift package compute-checksum build/XCFrameworks/release/KmpNfc.xcframework.zip)
+          git fetch origin main
+          git checkout main
+          cat > Package.swift << SWIFT
+          // swift-tools-version:5.9
+          import PackageDescription
+
+          let package = Package(
+              name: "KmpNfc",
+              platforms: [.iOS(.v15)],
+              products: [
+                  .library(name: "KmpNfc", targets: ["KmpNfc"]),
+              ],
+              targets: [
+                  .binaryTarget(
+                      name: "KmpNfc",
+                      url: "https://github.com/gary-quinn/kmp-nfc/releases/download/${VERSION}/KmpNfc.xcframework.zip",
+                      checksum: "${CHECKSUM}"
+                  ),
+              ]
+          )
+          SWIFT
+          git config user.email "gary@atruedev.com"
+          git config user.name "Gary Quinn"
+          git add Package.swift
+          git diff --cached --quiet || git commit -m "update Package.swift for ${VERSION}"
+          git push origin main
+
+  deploy-api-docs:
+    needs: publish
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@39e147cb9de83bb9910b8ef8bd7fff0ee20fcd6f # v6.0.1
+
+      - name: Generate API docs (Dokka)
+        run: ./gradlew dokkaGenerate
+        env:
+          VERSION: ${{ github.ref_name }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
+        with:
+          path: build/dokka/html
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
