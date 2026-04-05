@@ -23,6 +23,7 @@ import com.atruedev.kmpnfc.tag.TagTechnology
 import com.atruedev.kmpnfc.tag.TagType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import android.nfc.tech.TagTechnology as AndroidTagTech
 
 internal class AndroidNfcTag(
     private val tag: Tag,
@@ -60,8 +61,7 @@ internal class AndroidNfcTag(
                 try {
                     ndef.connect()
                     if (!ndef.isWritable) throw NfcException(ReadOnly())
-                    val androidMessage = message.toAndroidNdefMessage()
-                    ndef.writeNdefMessage(androidMessage)
+                    ndef.writeNdefMessage(message.toAndroidNdefMessage())
                 } catch (e: NfcException) {
                     throw e
                 } catch (e: android.nfc.TagLostException) {
@@ -93,67 +93,46 @@ internal class AndroidNfcTag(
 
     override suspend fun transceive(data: ByteArray): ByteArray =
         withContext(Dispatchers.IO) {
+            val tech =
+                resolveTransceiveTech()
+                    ?: throw NfcException(UnsupportedOperation("transceive"))
             try {
-                when {
-                    IsoDep.get(tag) != null -> {
-                        val isoDep = IsoDep.get(tag)
-                        isoDep.connect()
-                        try {
-                            isoDep.transceive(data)
-                        } finally {
-                            runCatching { isoDep.close() }
-                        }
-                    }
-                    NfcA.get(tag) != null -> {
-                        val nfcA = NfcA.get(tag)
-                        nfcA.connect()
-                        try {
-                            nfcA.transceive(data)
-                        } finally {
-                            runCatching { nfcA.close() }
-                        }
-                    }
-                    NfcB.get(tag) != null -> {
-                        val nfcB = NfcB.get(tag)
-                        nfcB.connect()
-                        try {
-                            nfcB.transceive(data)
-                        } finally {
-                            runCatching { nfcB.close() }
-                        }
-                    }
-                    NfcF.get(tag) != null -> {
-                        val nfcF = NfcF.get(tag)
-                        nfcF.connect()
-                        try {
-                            nfcF.transceive(data)
-                        } finally {
-                            runCatching { nfcF.close() }
-                        }
-                    }
-                    NfcV.get(tag) != null -> {
-                        val nfcV = NfcV.get(tag)
-                        nfcV.connect()
-                        try {
-                            nfcV.transceive(data)
-                        } finally {
-                            runCatching { nfcV.close() }
-                        }
-                    }
-                    else -> throw NfcException(UnsupportedOperation("transceive"))
-                }
+                tech.connect()
+                transceiveWith(tech, data)
             } catch (e: NfcException) {
                 throw e
             } catch (e: android.nfc.TagLostException) {
                 throw NfcException(TagLost(cause = e))
             } catch (e: java.io.IOException) {
                 throw NfcException(TransceiveError(message = e.message ?: "Transceive failed", cause = e))
+            } finally {
+                runCatching { tech.close() }
             }
         }
 
     override fun close() {
         // Tag resources are cleaned up per-operation via tech.close() in each method.
     }
+
+    private fun resolveTransceiveTech(): AndroidTagTech? =
+        IsoDep.get(tag)
+            ?: NfcA.get(tag)
+            ?: NfcB.get(tag)
+            ?: NfcF.get(tag)
+            ?: NfcV.get(tag)
+
+    private fun transceiveWith(
+        tech: AndroidTagTech,
+        data: ByteArray,
+    ): ByteArray =
+        when (tech) {
+            is IsoDep -> tech.transceive(data)
+            is NfcA -> tech.transceive(data)
+            is NfcB -> tech.transceive(data)
+            is NfcF -> tech.transceive(data)
+            is NfcV -> tech.transceive(data)
+            else -> throw NfcException(UnsupportedOperation("transceive"))
+        }
 }
 
 private fun android.nfc.NdefMessage.toKmpNdefMessage(): NdefMessage =
@@ -172,10 +151,10 @@ private fun android.nfc.NdefRecord.toKmpNdefRecord(): NdefRecord {
         }
 
     if (tnfValue == TypeNameFormat.WELL_KNOWN) {
-        if (type.contentEquals(byteArrayOf(0x55))) { // RTD_URI = 'U'
+        if (type.contentEquals(byteArrayOf(0x55))) {
             return NdefRecord.Uri(decodeUriPayload(payload))
         }
-        if (type.contentEquals(byteArrayOf(0x54))) { // RTD_TEXT = 'T'
+        if (type.contentEquals(byteArrayOf(0x54))) {
             val (text, locale, encoding) = decodeTextPayload(payload)
             return NdefRecord.Text(text, locale, encoding)
         }

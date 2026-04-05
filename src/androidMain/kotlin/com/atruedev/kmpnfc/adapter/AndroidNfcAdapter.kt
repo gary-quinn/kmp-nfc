@@ -1,7 +1,5 @@
 package com.atruedev.kmpnfc.adapter
 
-import android.app.Activity
-import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -61,10 +59,10 @@ internal class AndroidNfcAdapter(
     override fun tags(options: ReaderOptions): Flow<NfcTag> =
         callbackFlow {
             val activity =
-                resolveActivity()
+                ActivityTracker.resumedActivity
                     ?: throw IllegalStateException(
                         "NFC reader mode requires a resumed Activity. " +
-                            "Ensure you call tags() from an Activity context.",
+                            "Ensure you collect tags() while an Activity is in the foreground.",
                     )
 
             var flags = 0
@@ -75,15 +73,11 @@ internal class AndroidNfcAdapter(
 
             if (flags == 0) flags = android.nfc.NfcAdapter.FLAG_READER_NFC_A
 
-            val extras = Bundle()
-
             androidAdapter?.enableReaderMode(
                 activity,
-                { tag: Tag ->
-                    trySend(AndroidNfcTag(tag))
-                },
+                { tag: Tag -> trySend(AndroidNfcTag(tag)) },
                 flags,
-                extras,
+                Bundle(),
             )
 
             awaitClose {
@@ -110,6 +104,9 @@ internal class AndroidNfcAdapter(
             canWriteNdef = true,
             canReadRawTag = true,
             canHostCardEmulation = true,
+            // Android CAN dispatch NFC intents in the background via intent filters, but this
+            // library uses reader mode which requires a foreground Activity. Background dispatch
+            // is an app-manifest concern, not a library capability.
             canBackgroundRead = false,
             supportedTagTypes =
                 setOf(
@@ -122,38 +119,6 @@ internal class AndroidNfcAdapter(
                     TagType.MIFARE_ULTRALIGHT,
                 ),
         )
-    }
-
-    private fun resolveActivity(): Activity? {
-        var currentActivity: Activity? = null
-        (context.applicationContext as? Application)?.registerActivityLifecycleCallbacks(
-            object : Application.ActivityLifecycleCallbacks {
-                override fun onActivityResumed(activity: Activity) {
-                    currentActivity = activity
-                }
-
-                override fun onActivityPaused(activity: Activity) {
-                    if (currentActivity == activity) currentActivity = null
-                }
-
-                override fun onActivityCreated(
-                    activity: Activity,
-                    savedInstanceState: Bundle?,
-                ) = Unit
-
-                override fun onActivityStarted(activity: Activity) = Unit
-
-                override fun onActivityStopped(activity: Activity) = Unit
-
-                override fun onActivitySaveInstanceState(
-                    activity: Activity,
-                    outState: Bundle,
-                ) = Unit
-
-                override fun onActivityDestroyed(activity: Activity) = Unit
-            },
-        )
-        return currentActivity
     }
 }
 

@@ -102,8 +102,11 @@ public data class Timeout(
  * Exception wrapper for [NfcError] values, allowing them to be thrown as exceptions.
  * Used by [com.atruedev.kmpnfc.testing.FakeNfcTag] error injection
  * and catchable in test assertions.
+ *
+ * Not a data class — exceptions use identity equality, not structural equality.
  */
-public data class NfcException(
+public class NfcException(
     public val error: NfcError,
-    val errorMessage: String = error.toString(),
-) : Exception(errorMessage)
+) : Exception(error.toString()) {
+    override fun toString(): String = "NfcException($error)"
+}

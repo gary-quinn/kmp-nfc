@@ -1,5 +1,6 @@
 package com.atruedev.kmpnfc.adapter
 
+import android.app.Application
 import android.content.Context
 import androidx.startup.Initializer
 
@@ -25,6 +26,7 @@ import androidx.startup.Initializer
 public class KmpNfcInitializer : Initializer<Unit> {
     override fun create(context: Context) {
         KmpNfc.init(context)
+        (context.applicationContext as? Application)?.let { ActivityTracker.install(it) }
     }
 
     override fun dependencies(): List<Class<out Initializer<*>>> = emptyList()
