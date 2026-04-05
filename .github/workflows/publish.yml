@@ -127,3 +127,95 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+
+  update-docs:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Get release metadata
+        id: meta
+        run: |
+          echo "date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+          PREV_TAG=$(git tag --sort=-version:refname | grep -v "^${{ needs.publish.outputs.tag }}$" | head -1)
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog entries from merged PRs
+        id: changelog
+        uses: gary-quinn/shared-actions/changelog@4975dde119744969d162d01444f13e2515c639c2 # v1
+        with:
+          prev_tag: ${{ steps.meta.outputs.prev_tag }}
+          current_tag: ${{ needs.publish.outputs.tag }}
+
+      - name: Update README.md
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          sed -i -E "s|implementation\(\"com\.atruedev:kmp-nfc(-[a-z]+)?:[^\"]*\"\)|implementation(\"com.atruedev:kmp-nfc\1:$VERSION\")|g" README.md
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          TAG="${{ needs.publish.outputs.tag }}"
+          PREV_TAG="${{ steps.meta.outputs.prev_tag }}"
+          DATE="${{ steps.meta.outputs.date }}"
+          ENTRIES=$(cat ${{ steps.changelog.outputs.entries_file }})
+
+          awk -v version="$VERSION" -v date="$DATE" -v entries="$ENTRIES" '
+          /^## \[Unreleased\]/ {
+            print "## [Unreleased]"
+            print ""
+            print "_Changes on `main` that have not yet been tagged for release._"
+            print ""
+            print "---"
+            print ""
+            print "## [" version "] - " date
+            print entries
+            found = 1
+            next
+          }
+          found && /^_Changes on `main` that have not yet been tagged for release._$/ { next }
+          { print }
+          ' CHANGELOG.md > /tmp/changelog_new.md
+          mv /tmp/changelog_new.md CHANGELOG.md
+
+          sed -i "s|\[Unreleased\]: \(.*\)/compare/.*\.\.\.HEAD|[Unreleased]: \1/compare/$TAG...HEAD|" CHANGELOG.md
+
+          if [ -n "$PREV_TAG" ]; then
+            sed -i "/^\[Unreleased\]:.*$/a [$VERSION]: https://github.com/gary-quinn/kmp-nfc/compare/$PREV_TAG...$TAG" CHANGELOG.md
+          fi
+
+      - name: Update llms.txt
+        run: |
+          VERSION="${{ needs.publish.outputs.version }}"
+          sed -i -E "s|implementation\(\"com\.atruedev:kmp-nfc(-[a-z]+)?:[^\"]*\"\)|implementation(\"com.atruedev:kmp-nfc\1:$VERSION\")|g" llms.txt
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@c0f553fe549906ede9cf27b5156039d195d2ece0 # v8.1.0
+        with:
+          commit-message: "docs: update docs for v${{ needs.publish.outputs.version }}"
+          title: "docs: update docs for v${{ needs.publish.outputs.version }}"
+          body: |
+            Automated PR to update project docs with the new release version.
+
+            **Updated files:**
+            - `README.md` — dependency version
+            - `CHANGELOG.md` — auto-generated entries from merged PRs
+            - `llms.txt` — dependency version
+
+            Release: ${{ needs.publish.outputs.release_url }}
+          branch: update-docs-${{ needs.publish.outputs.version }}
+          base: main
+          delete-branch: true
+
+      - name: Auto-approve and merge PR
+        if: steps.create-pr.outputs.pull-request-number
+        run: |
+          gh pr review --approve "${{ steps.create-pr.outputs.pull-request-url }}"
+          gh pr merge --squash "${{ steps.create-pr.outputs.pull-request-url }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.AUTO_MERGE_PAT }}
