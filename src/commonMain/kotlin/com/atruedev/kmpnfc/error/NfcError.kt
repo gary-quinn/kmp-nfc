@@ -21,9 +21,6 @@ public sealed interface AdapterError : NfcError
 /** Errors occurring during tag read/write operations. */
 public sealed interface TagOperationError : NfcError
 
-/** Errors related to Host Card Emulation. */
-public sealed interface HceError : NfcError
-
 /** NFC hardware not present on this device. */
 public data class NotSupported(
     override val message: String = "NFC is not supported on this device",
@@ -78,13 +75,6 @@ public data class InsufficientSpace(
     override val message: String = "Tag does not have enough storage space",
     override val cause: Throwable? = null,
 ) : TagOperationError
-
-/** HCE not available on this platform/region/configuration. */
-public data class HceNotAvailable(
-    val reason: String,
-    override val message: String = "Host Card Emulation not available: $reason",
-    override val cause: Throwable? = null,
-) : HceError
 
 /** iOS reader session invalidated by system (timeout, user dismissal, or system event). */
 public data class SessionInvalidated(

@@ -1,7 +1,7 @@
 package com.atruedev.kmpnfc
 
-import com.atruedev.kmpnfc.hce.ApduCommand
-import com.atruedev.kmpnfc.hce.ApduResponse
+import com.atruedev.kmpnfc.tag.ApduCommand
+import com.atruedev.kmpnfc.tag.ApduResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull

@@ -69,7 +69,6 @@ class NfcAdapterTest {
         assertTrue(adapter.capabilities.canReadNdef)
         assertTrue(adapter.capabilities.canWriteNdef)
         assertTrue(adapter.capabilities.canReadRawTag)
-        assertTrue(adapter.capabilities.canHostCardEmulation)
         assertFalse(adapter.capabilities.canBackgroundRead)
         assertTrue(TagType.NFC_A in adapter.capabilities.supportedTagTypes)
         assertTrue(TagType.ISO_DEP in adapter.capabilities.supportedTagTypes)
@@ -81,7 +80,6 @@ class NfcAdapterTest {
         assertFalse(none.canReadNdef)
         assertFalse(none.canWriteNdef)
         assertFalse(none.canReadRawTag)
-        assertFalse(none.canHostCardEmulation)
         assertFalse(none.canBackgroundRead)
         assertTrue(none.supportedTagTypes.isEmpty())
     }
@@ -93,7 +91,6 @@ class NfcAdapterTest {
                 canReadNdef = true,
                 canWriteNdef = false,
                 canReadRawTag = false,
-                canHostCardEmulation = false,
                 canBackgroundRead = true,
                 supportedTagTypes = setOf(TagType.NFC_A),
             )

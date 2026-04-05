@@ -1,5 +1,7 @@
 package com.atruedev.kmpnfc.adapter
 
+import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.SessionInvalidated
 import com.atruedev.kmpnfc.reader.IosNfcTag
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.reader.ReaderOptions
@@ -69,7 +71,14 @@ internal class IosNfcAdapter : NfcAdapter {
                         session: NFCTagReaderSession,
                         didInvalidateWithError: NSError,
                     ) {
-                        close()
+                        close(
+                            NfcException(
+                                SessionInvalidated(
+                                    message = didInvalidateWithError.localizedDescription,
+                                    cause = Exception(didInvalidateWithError.localizedDescription),
+                                ),
+                            ),
+                        )
                     }
 
                     override fun tagReaderSessionDidBecomeActive(session: NFCTagReaderSession) = Unit
@@ -114,7 +123,6 @@ internal class IosNfcAdapter : NfcAdapter {
             canReadNdef = true,
             canWriteNdef = isIos13Plus,
             canReadRawTag = isIos13Plus,
-            canHostCardEmulation = false,
             canBackgroundRead = true,
             supportedTagTypes =
                 if (isIos13Plus) {

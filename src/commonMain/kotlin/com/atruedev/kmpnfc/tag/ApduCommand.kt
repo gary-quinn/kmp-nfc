@@ -1,4 +1,4 @@
-package com.atruedev.kmpnfc.hce
+package com.atruedev.kmpnfc.tag
 
 /**
  * An ISO 7816-4 APDU command received from an external NFC reader.

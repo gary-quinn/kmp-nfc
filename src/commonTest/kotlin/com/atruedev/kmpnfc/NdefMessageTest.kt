@@ -4,6 +4,7 @@ import com.atruedev.kmpnfc.ndef.NdefRecord
 import com.atruedev.kmpnfc.ndef.NdefTextEncoding
 import com.atruedev.kmpnfc.ndef.TypeNameFormat
 import com.atruedev.kmpnfc.ndef.ndefMessage
+import com.atruedev.kmpnfc.ndef.parseNdefRecord
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -85,5 +86,77 @@ class NdefMessageTest {
         assertEquals(2, payload[0].toInt() and 0x3F)
         assertEquals("en", payload.copyOfRange(1, 3).decodeToString())
         assertEquals("Hello", payload.copyOfRange(3, payload.size).decodeToString())
+    }
+
+    @Test
+    fun uriRecordRoundtripThroughParseNdefRecord() {
+        val original = NdefRecord.Uri("https://example.com/path?q=1")
+        val parsed = parseNdefRecord(original.tnf, original.type, original.payload)
+        assertIs<NdefRecord.Uri>(parsed)
+        assertEquals(original.uri, parsed.uri)
+    }
+
+    @Test
+    fun textRecordRoundtripThroughParseNdefRecord() {
+        val original = NdefRecord.Text("Bonjour", locale = "fr", encoding = NdefTextEncoding.UTF_8)
+        val parsed = parseNdefRecord(original.tnf, original.type, original.payload)
+        assertIs<NdefRecord.Text>(parsed)
+        assertEquals(original.text, parsed.text)
+        assertEquals(original.locale, parsed.locale)
+        assertEquals(original.encoding, parsed.encoding)
+    }
+
+    @Test
+    fun mimeMediaRecordRoundtripThroughParseNdefRecord() {
+        val data = """{"status":"ok"}""".encodeToByteArray()
+        val original = NdefRecord.MimeMedia("application/json", data)
+        val parsed = parseNdefRecord(original.tnf, original.type, original.payload)
+        assertIs<NdefRecord.MimeMedia>(parsed)
+        assertEquals(original.mimeType, parsed.mimeType)
+        assertTrue(original.data.contentEquals(parsed.data))
+    }
+
+    @Test
+    fun externalTypeRecordRoundtripThroughParseNdefRecord() {
+        val data = byteArrayOf(0x01, 0x02, 0x03)
+        val original = NdefRecord.ExternalType("com.example", "mytype", data)
+        val parsed = parseNdefRecord(original.tnf, original.type, original.payload)
+        assertIs<NdefRecord.ExternalType>(parsed)
+        assertEquals(original.domain, parsed.domain)
+        assertEquals(original.externalType, parsed.externalType)
+        assertTrue(original.data.contentEquals(parsed.data))
+    }
+
+    @Test
+    fun unknownRecordPreservedThroughParseNdefRecord() {
+        val type = byteArrayOf(0xFF.toByte())
+        val payload = byteArrayOf(0x01, 0x02)
+        val parsed = parseNdefRecord(TypeNameFormat.UNKNOWN, type, payload)
+        assertIs<NdefRecord.Unknown>(parsed)
+        assertEquals(TypeNameFormat.UNKNOWN, parsed.tnf)
+        assertTrue(type.contentEquals(parsed.type))
+        assertTrue(payload.contentEquals(parsed.payload))
+    }
+
+    @Test
+    fun multiRecordMessageRoundtripThroughParseNdefRecord() {
+        val message =
+            ndefMessage {
+                uri("https://github.com")
+                text("Hello NFC", locale = "en")
+                mimeMedia("text/plain", "test".encodeToByteArray())
+                externalType("com.test", "data", byteArrayOf(0x42))
+            }
+        val roundtripped =
+            message.records.map { record ->
+                parseNdefRecord(record.tnf, record.type, record.payload)
+            }
+        assertEquals(4, roundtripped.size)
+        assertIs<NdefRecord.Uri>(roundtripped[0])
+        assertEquals("https://github.com", (roundtripped[0] as NdefRecord.Uri).uri)
+        assertIs<NdefRecord.Text>(roundtripped[1])
+        assertEquals("Hello NFC", (roundtripped[1] as NdefRecord.Text).text)
+        assertIs<NdefRecord.MimeMedia>(roundtripped[2])
+        assertIs<NdefRecord.ExternalType>(roundtripped[3])
     }
 }

@@ -103,7 +103,6 @@ internal class AndroidNfcAdapter(
             canReadNdef = true,
             canWriteNdef = true,
             canReadRawTag = true,
-            canHostCardEmulation = true,
             // Android CAN dispatch NFC intents in the background via intent filters, but this
             // library uses reader mode which requires a foreground Activity. Background dispatch
             // is an app-manifest concern, not a library capability.

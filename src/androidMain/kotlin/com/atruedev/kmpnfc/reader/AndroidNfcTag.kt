@@ -17,8 +17,7 @@ import com.atruedev.kmpnfc.error.UnsupportedOperation
 import com.atruedev.kmpnfc.ndef.NdefMessage
 import com.atruedev.kmpnfc.ndef.NdefRecord
 import com.atruedev.kmpnfc.ndef.TypeNameFormat
-import com.atruedev.kmpnfc.ndef.decodeTextPayload
-import com.atruedev.kmpnfc.ndef.decodeUriPayload
+import com.atruedev.kmpnfc.ndef.parseNdefRecord
 import com.atruedev.kmpnfc.tag.TagTechnology
 import com.atruedev.kmpnfc.tag.TagType
 import kotlinx.coroutines.Dispatchers
@@ -149,36 +148,7 @@ private fun android.nfc.NdefRecord.toKmpNdefRecord(): NdefRecord {
             android.nfc.NdefRecord.TNF_UNCHANGED -> TypeNameFormat.UNCHANGED
             else -> TypeNameFormat.UNKNOWN
         }
-
-    if (tnfValue == TypeNameFormat.WELL_KNOWN) {
-        if (type.contentEquals(byteArrayOf(0x55))) {
-            return NdefRecord.Uri(decodeUriPayload(payload))
-        }
-        if (type.contentEquals(byteArrayOf(0x54))) {
-            val (text, locale, encoding) = decodeTextPayload(payload)
-            return NdefRecord.Text(text, locale, encoding)
-        }
-    }
-
-    if (tnfValue == TypeNameFormat.MIME_MEDIA) {
-        return NdefRecord.MimeMedia(type.decodeToString(), payload)
-    }
-
-    if (tnfValue == TypeNameFormat.EXTERNAL_TYPE) {
-        val fullType = type.decodeToString()
-        val colonIndex = fullType.indexOf(':')
-        return if (colonIndex >= 0) {
-            NdefRecord.ExternalType(
-                fullType.substring(0, colonIndex),
-                fullType.substring(colonIndex + 1),
-                payload,
-            )
-        } else {
-            NdefRecord.ExternalType(fullType, "", payload)
-        }
-    }
-
-    return NdefRecord.Unknown(tnfValue, type, payload)
+    return parseNdefRecord(tnfValue, type, payload)
 }
 
 private fun NdefMessage.toAndroidNdefMessage(): android.nfc.NdefMessage =
