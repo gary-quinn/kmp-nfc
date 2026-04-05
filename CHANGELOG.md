@@ -15,6 +15,14 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
+## [0.0.2] - 2026-04-05
+
+### Fixed
+- fix(ci): strip v prefix from VERSION env passed to Gradle
+
+
+---
+
 ## [0.0.1] - 2026-04-05
 
 ### Added
@@ -26,4 +34,5 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
-[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.1...v0.0.2
