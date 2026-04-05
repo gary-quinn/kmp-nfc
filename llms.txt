@@ -17,7 +17,7 @@ Maven Central group: `com.atruedev`
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("com.atruedev:kmp-nfc:0.0.1")
+            implementation("com.atruedev:kmp-nfc:0.0.2")
         }
     }
 }

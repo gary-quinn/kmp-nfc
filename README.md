@@ -25,7 +25,7 @@ Part of the wireless trifecta: [kmp-ble](https://github.com/gary-quinn/kmp-ble) 
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("com.atruedev:kmp-nfc:0.0.1")
+            implementation("com.atruedev:kmp-nfc:0.0.2")
 
             // Optional: test doubles for unit testing
             // testImplementation("com.atruedev:kmp-nfc-testing:0.1.0")
