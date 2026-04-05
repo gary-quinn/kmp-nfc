@@ -1,0 +1,25 @@
+[versions]
+kotlin = "2.3.20"
+dokka = "2.2.0"
+ktlint = "14.2.0"
+agp = "9.1.0"
+coroutines = "1.10.2"
+androidMinSdk = "33"
+androidCompileSdk = "36"
+androidx-core = "1.18.0"
+turbine = "1.2.1"
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+androidx-startup = { module = "androidx.startup:startup-runtime", version = "1.2.0" }
+turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+vanniktech-publish = { id = "com.vanniktech.maven.publish", version = "0.36.0" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
