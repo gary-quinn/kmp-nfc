@@ -48,6 +48,9 @@ import kotlin.coroutines.suspendCoroutine
 internal class IosNfcTag(
     private val nfcTag: Any,
     private val session: NFCTagReaderSession,
+    private val tagDispatcher: kotlinx.coroutines.CoroutineDispatcher =
+        kotlinx.coroutines.Dispatchers.Default
+            .limitedParallelism(1),
 ) : NfcTag {
     private val tagProtocol: NFCTagProtocol? = nfcTag as? NFCTagProtocol
     private val iso7816Tag = nfcTag as? NFCISO7816TagProtocol
@@ -56,7 +59,7 @@ internal class IosNfcTag(
     private val mifareTag = nfcTag as? NFCMiFareTagProtocol
     private val ndefTag = nfcTag as? NFCNDEFTagProtocol
 
-    private val connected = kotlin.concurrent.AtomicInt(0)
+    private var connected = false
 
     override val identifier: ByteArray = resolveIdentifier()
 
@@ -64,48 +67,52 @@ internal class IosNfcTag(
 
     override val technologies: Set<TagTechnology> = resolveTechnologies()
 
-    override suspend fun readNdef(): NdefMessage? {
-        val ndef = ndefTag ?: throw NfcException(UnsupportedOperation("readNdef"))
-        ensureConnected()
-        val status = queryNdefStatus(ndef)
-        if (status == NFCNDEFStatusNotSupported) return null
-        return readNdefMessage(ndef)
-    }
+    override suspend fun readNdef(): NdefMessage? =
+        kotlinx.coroutines.withContext(tagDispatcher) {
+            val ndef = ndefTag ?: throw NfcException(UnsupportedOperation("readNdef"))
+            ensureConnected()
+            val status = queryNdefStatus(ndef)
+            if (status == NFCNDEFStatusNotSupported) return@withContext null
+            readNdefMessage(ndef)
+        }
 
-    override suspend fun writeNdef(message: NdefMessage) {
-        val ndef = ndefTag ?: throw NfcException(UnsupportedOperation("writeNdef"))
-        ensureConnected()
-        val status = queryNdefStatus(ndef)
-        if (status == NFCNDEFStatusNotSupported) {
-            throw NfcException(UnsupportedOperation("writeNdef — tag does not support NDEF"))
+    override suspend fun writeNdef(message: NdefMessage) =
+        kotlinx.coroutines.withContext(tagDispatcher) {
+            val ndef = ndefTag ?: throw NfcException(UnsupportedOperation("writeNdef"))
+            ensureConnected()
+            val status = queryNdefStatus(ndef)
+            if (status == NFCNDEFStatusNotSupported) {
+                throw NfcException(UnsupportedOperation("writeNdef — tag does not support NDEF"))
+            }
+            if (status == NFCNDEFStatusReadOnly) {
+                throw NfcException(
+                    com.atruedev.kmpnfc.error
+                        .ReadOnly(),
+                )
+            }
+            writeNdefMessage(ndef, message)
         }
-        if (status == NFCNDEFStatusReadOnly) {
-            throw NfcException(
-                com.atruedev.kmpnfc.error
-                    .ReadOnly(),
-            )
-        }
-        writeNdefMessage(ndef, message)
-    }
 
     @OptIn(ExperimentalForeignApi::class)
-    override suspend fun transceive(data: ByteArray): ByteArray {
-        ensureConnected()
-        val iso7816 = iso7816Tag
-        if (iso7816 != null) return sendApduToIso7816(iso7816, data)
-        val mifareRef = mifareTag
-        if (mifareRef != null) return sendDataToMiFare(mifareRef, data)
-        throw NfcException(
-            UnsupportedOperation("transceive — tag type does not support raw transceive on iOS"),
-        )
-    }
+    override suspend fun transceive(data: ByteArray): ByteArray =
+        kotlinx.coroutines.withContext(tagDispatcher) {
+            ensureConnected()
+            val iso7816 = iso7816Tag
+            if (iso7816 != null) return@withContext sendApduToIso7816(iso7816, data)
+            val mifareRef = mifareTag
+            if (mifareRef != null) return@withContext sendDataToMiFare(mifareRef, data)
+            throw NfcException(
+                UnsupportedOperation("transceive — tag type does not support raw transceive on iOS"),
+            )
+        }
 
     override fun close() {
         // Session lifecycle manages tag connections on iOS.
     }
 
+    // Safe to use plain boolean — all callers dispatch through tagDispatcher (limitedParallelism(1)).
     private suspend fun ensureConnected() {
-        if (!connected.compareAndSet(0, 1)) return
+        if (connected) return
         val protocol =
             tagProtocol
                 ?: throw NfcException(
@@ -114,9 +121,9 @@ internal class IosNfcTag(
         suspendCoroutine { cont ->
             session.connectToTag(protocol) { error ->
                 if (error != null) {
-                    connected.value = 0
                     cont.resumeWithException(NfcException(TagLost(cause = error.toException())))
                 } else {
+                    connected = true
                     cont.resume(Unit)
                 }
             }
