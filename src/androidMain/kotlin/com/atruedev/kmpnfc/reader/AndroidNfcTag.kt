@@ -165,5 +165,7 @@ private fun NdefRecord.toAndroidNdefRecord(): android.nfc.NdefRecord {
             TypeNameFormat.UNKNOWN -> android.nfc.NdefRecord.TNF_UNKNOWN
             TypeNameFormat.UNCHANGED -> android.nfc.NdefRecord.TNF_UNCHANGED
         }
+    // NDEF record ID is not modeled in kmp-nfc — it's optional per the NFC Forum spec
+    // and unused by the vast majority of tags. If needed, add an id field to NdefRecord.
     return android.nfc.NdefRecord(tnfValue, type, byteArrayOf(), payload)
 }

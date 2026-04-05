@@ -97,6 +97,6 @@ public data class Timeout(
  */
 public class NfcException(
     public val error: NfcError,
-) : Exception(error.toString()) {
+) : Exception(error.message, error.cause) {
     override fun toString(): String = "NfcException($error)"
 }

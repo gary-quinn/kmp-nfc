@@ -16,8 +16,8 @@ public sealed interface NdefRecord {
         val uri: String,
     ) : NdefRecord {
         override val tnf: TypeNameFormat get() = TypeNameFormat.WELL_KNOWN
-        override val type: ByteArray get() = byteArrayOf(0x55) // 'U'
-        override val payload: ByteArray get() = encodeUriPayload(uri)
+        override val type: ByteArray by lazy { byteArrayOf(0x55) } // 'U'
+        override val payload: ByteArray by lazy { encodeUriPayload(uri) }
     }
 
     /** Well-known Text record (TNF_WELL_KNOWN + RTD_TEXT). */
@@ -27,8 +27,8 @@ public sealed interface NdefRecord {
         val encoding: NdefTextEncoding = NdefTextEncoding.UTF_8,
     ) : NdefRecord {
         override val tnf: TypeNameFormat get() = TypeNameFormat.WELL_KNOWN
-        override val type: ByteArray get() = byteArrayOf(0x54) // 'T'
-        override val payload: ByteArray get() = encodeTextPayload(text, locale, encoding)
+        override val type: ByteArray by lazy { byteArrayOf(0x54) } // 'T'
+        override val payload: ByteArray by lazy { encodeTextPayload(text, locale, encoding) }
     }
 
     /** MIME media record (TNF_MIME_MEDIA). */
@@ -37,7 +37,7 @@ public sealed interface NdefRecord {
         val data: ByteArray,
     ) : NdefRecord {
         override val tnf: TypeNameFormat get() = TypeNameFormat.MIME_MEDIA
-        override val type: ByteArray get() = mimeType.encodeToByteArray()
+        override val type: ByteArray by lazy { mimeType.encodeToByteArray() }
         override val payload: ByteArray get() = data
 
         override fun equals(other: Any?): Boolean {
@@ -56,7 +56,7 @@ public sealed interface NdefRecord {
         val data: ByteArray,
     ) : NdefRecord {
         override val tnf: TypeNameFormat get() = TypeNameFormat.EXTERNAL_TYPE
-        override val type: ByteArray get() = "$domain:$externalType".encodeToByteArray()
+        override val type: ByteArray by lazy { "$domain:$externalType".encodeToByteArray() }
         override val payload: ByteArray get() = data
 
         override fun equals(other: Any?): Boolean {

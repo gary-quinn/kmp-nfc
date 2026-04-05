@@ -56,7 +56,7 @@ internal class IosNfcTag(
     private val mifareTag = nfcTag as? NFCMiFareTagProtocol
     private val ndefTag = nfcTag as? NFCNDEFTagProtocol
 
-    private var connected = false
+    private val connected = kotlin.concurrent.AtomicInt(0)
 
     override val identifier: ByteArray = resolveIdentifier()
 
@@ -105,7 +105,7 @@ internal class IosNfcTag(
     }
 
     private suspend fun ensureConnected() {
-        if (connected) return
+        if (!connected.compareAndSet(0, 1)) return
         val protocol =
             tagProtocol
                 ?: throw NfcException(
@@ -114,9 +114,9 @@ internal class IosNfcTag(
         suspendCoroutine { cont ->
             session.connectToTag(protocol) { error ->
                 if (error != null) {
+                    connected.value = 0
                     cont.resumeWithException(NfcException(TagLost(cause = error.toException())))
                 } else {
-                    connected = true
                     cont.resume(Unit)
                 }
             }
@@ -155,7 +155,13 @@ internal class IosNfcTag(
             }
             if (mifareTag != null) {
                 add(TagTechnology.NFC_A)
-                add(TagTechnology.MIFARE_ULTRALIGHT)
+                when (mifareTag.mifareFamily) {
+                    platform.CoreNFC.NFCMiFareUltralight -> add(TagTechnology.MIFARE_ULTRALIGHT)
+                    platform.CoreNFC.NFCMiFarePlus,
+                    platform.CoreNFC.NFCMiFareDESFire,
+                    -> add(TagTechnology.MIFARE_CLASSIC)
+                    else -> {}
+                }
             }
             if (iso15693Tag != null) add(TagTechnology.NFC_V)
             if (felicaTag != null) add(TagTechnology.NFC_F)

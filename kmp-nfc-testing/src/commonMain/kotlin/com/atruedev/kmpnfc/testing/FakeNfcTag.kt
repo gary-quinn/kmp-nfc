@@ -31,8 +31,9 @@ public class FakeNfcTag(
     private val transceiveHandler: (suspend (ByteArray) -> ByteArray)? = null,
     private val error: NfcError? = null,
     private val responseDelay: Duration = Duration.ZERO,
-    private val writtenMessages: MutableList<NdefMessage> = mutableListOf(),
 ) : NfcTag {
+    private val writtenMessages = mutableListOf<NdefMessage>()
+
     /** Messages written to this tag via [writeNdef]. */
     public val writtenNdefMessages: List<NdefMessage> get() = writtenMessages.toList()
 
