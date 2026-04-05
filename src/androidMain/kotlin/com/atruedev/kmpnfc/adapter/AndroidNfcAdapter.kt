@@ -14,6 +14,8 @@ import android.nfc.tech.NfcB
 import android.nfc.tech.NfcF
 import android.nfc.tech.NfcV
 import android.os.Bundle
+import com.atruedev.kmpnfc.error.AdapterDisabled
+import com.atruedev.kmpnfc.error.NfcException
 import com.atruedev.kmpnfc.reader.AndroidNfcTag
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.reader.ReaderOptions
@@ -60,9 +62,8 @@ internal class AndroidNfcAdapter(
         callbackFlow {
             val activity =
                 ActivityTracker.resumedActivity
-                    ?: throw IllegalStateException(
-                        "NFC reader mode requires a resumed Activity. " +
-                            "Ensure you collect tags() while an Activity is in the foreground.",
+                    ?: throw NfcException(
+                        AdapterDisabled("NFC reader mode requires a resumed Activity in the foreground"),
                     )
 
             var flags = 0

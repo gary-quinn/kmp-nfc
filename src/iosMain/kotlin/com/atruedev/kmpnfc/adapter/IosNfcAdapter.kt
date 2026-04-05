@@ -58,9 +58,8 @@ internal class IosNfcAdapter : NfcAdapter {
                         didDetectTags: List<*>,
                     ) {
                         for (tag in didDetectTags) {
-                            if (tag != null) {
-                                trySend(IosNfcTag(tag, session))
-                            }
+                            val protocol = tag as? platform.CoreNFC.NFCTagProtocol ?: continue
+                            trySend(IosNfcTag(protocol, session))
                         }
                         if (!options.isMultiTagSession) {
                             session.invalidateSession()

@@ -1,6 +1,7 @@
 package com.atruedev.kmpnfc.reader
 
 import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.ReadOnly
 import com.atruedev.kmpnfc.error.TagLost
 import com.atruedev.kmpnfc.error.TransceiveError
 import com.atruedev.kmpnfc.error.UnsupportedOperation
@@ -14,6 +15,9 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import platform.CoreNFC.NFCFeliCaTagProtocol
 import platform.CoreNFC.NFCISO15693TagProtocol
 import platform.CoreNFC.NFCISO7816TagProtocol
@@ -35,29 +39,21 @@ import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 /**
- * iOS NFC tag implementation wrapping a Core NFC tag protocol object.
+ * iOS NFC tag wrapping a Core NFC [NFCTagProtocol].
  *
- * Core NFC delivers tags as protocol types (NFCISO7816Tag, NFCISO15693Tag,
- * NFCFeliCaTag, NFCMiFareTag). This class resolves the actual tag protocol,
- * extracts the real identifier/type, and delegates operations accordingly.
- *
- * Connection to the tag is established lazily on first operation and reused
- * for subsequent calls — Core NFC does not support reconnecting to an
- * already-connected tag.
+ * All mutable state (`connected`) is accessed exclusively through [tagDispatcher]
+ * (`limitedParallelism(1)`), eliminating the need for locks or atomics.
  */
 internal class IosNfcTag(
-    private val nfcTag: Any,
+    private val tag: NFCTagProtocol,
     private val session: NFCTagReaderSession,
-    private val tagDispatcher: kotlinx.coroutines.CoroutineDispatcher =
-        kotlinx.coroutines.Dispatchers.Default
-            .limitedParallelism(1),
+    private val tagDispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
 ) : NfcTag {
-    private val tagProtocol: NFCTagProtocol? = nfcTag as? NFCTagProtocol
-    private val iso7816Tag = nfcTag as? NFCISO7816TagProtocol
-    private val iso15693Tag = nfcTag as? NFCISO15693TagProtocol
-    private val felicaTag = nfcTag as? NFCFeliCaTagProtocol
-    private val mifareTag = nfcTag as? NFCMiFareTagProtocol
-    private val ndefTag = nfcTag as? NFCNDEFTagProtocol
+    private val iso7816Tag = tag as? NFCISO7816TagProtocol
+    private val iso15693Tag = tag as? NFCISO15693TagProtocol
+    private val felicaTag = tag as? NFCFeliCaTagProtocol
+    private val mifareTag = tag as? NFCMiFareTagProtocol
+    private val ndefTag = tag as? NFCNDEFTagProtocol
 
     private var connected = false
 
@@ -68,7 +64,7 @@ internal class IosNfcTag(
     override val technologies: Set<TagTechnology> = resolveTechnologies()
 
     override suspend fun readNdef(): NdefMessage? =
-        kotlinx.coroutines.withContext(tagDispatcher) {
+        withContext(tagDispatcher) {
             val ndef = ndefTag ?: throw NfcException(UnsupportedOperation("readNdef"))
             ensureConnected()
             val status = queryNdefStatus(ndef)
@@ -76,8 +72,8 @@ internal class IosNfcTag(
             readNdefMessage(ndef)
         }
 
-    override suspend fun writeNdef(message: NdefMessage) =
-        kotlinx.coroutines.withContext(tagDispatcher) {
+    override suspend fun writeNdef(message: NdefMessage): Unit =
+        withContext(tagDispatcher) {
             val ndef = ndefTag ?: throw NfcException(UnsupportedOperation("writeNdef"))
             ensureConnected()
             val status = queryNdefStatus(ndef)
@@ -85,41 +81,26 @@ internal class IosNfcTag(
                 throw NfcException(UnsupportedOperation("writeNdef — tag does not support NDEF"))
             }
             if (status == NFCNDEFStatusReadOnly) {
-                throw NfcException(
-                    com.atruedev.kmpnfc.error
-                        .ReadOnly(),
-                )
+                throw NfcException(ReadOnly())
             }
             writeNdefMessage(ndef, message)
         }
 
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun transceive(data: ByteArray): ByteArray =
-        kotlinx.coroutines.withContext(tagDispatcher) {
+        withContext(tagDispatcher) {
             ensureConnected()
-            val iso7816 = iso7816Tag
-            if (iso7816 != null) return@withContext sendApduToIso7816(iso7816, data)
-            val mifareRef = mifareTag
-            if (mifareRef != null) return@withContext sendDataToMiFare(mifareRef, data)
-            throw NfcException(
-                UnsupportedOperation("transceive — tag type does not support raw transceive on iOS"),
-            )
+            iso7816Tag?.let { return@withContext sendApduToIso7816(it, data) }
+            mifareTag?.let { return@withContext sendDataToMiFare(it, data) }
+            throw NfcException(UnsupportedOperation("transceive — unsupported tag type on iOS"))
         }
 
-    override fun close() {
-        // Session lifecycle manages tag connections on iOS.
-    }
+    override fun close() = Unit
 
-    // Safe to use plain boolean — all callers dispatch through tagDispatcher (limitedParallelism(1)).
     private suspend fun ensureConnected() {
         if (connected) return
-        val protocol =
-            tagProtocol
-                ?: throw NfcException(
-                    UnsupportedOperation("Tag does not conform to NFCTagProtocol"),
-                )
         suspendCoroutine { cont ->
-            session.connectToTag(protocol) { error ->
+            session.connectToTag(tag) { error ->
                 if (error != null) {
                     cont.resumeWithException(NfcException(TagLost(cause = error.toException())))
                 } else {
@@ -131,18 +112,10 @@ internal class IosNfcTag(
     }
 
     private fun resolveIdentifier(): ByteArray =
-        iso7816Tag
-            ?.identifier
-            ?.toByteArray()
-            ?: mifareTag
-                ?.identifier
-                ?.toByteArray()
-            ?: iso15693Tag
-                ?.identifier
-                ?.toByteArray()
-            ?: felicaTag
-                ?.currentIDm
-                ?.toByteArray()
+        iso7816Tag?.identifier?.toByteArray()
+            ?: mifareTag?.identifier?.toByteArray()
+            ?: iso15693Tag?.identifier?.toByteArray()
+            ?: felicaTag?.currentIDm?.toByteArray()
             ?: byteArrayOf()
 
     private fun resolveType(): TagType =
@@ -181,10 +154,7 @@ internal class IosNfcTag(
                 if (error != null) {
                     cont.resumeWithException(
                         NfcException(
-                            TransceiveError(
-                                message = error.localizedDescription,
-                                cause = error.toException(),
-                            ),
+                            TransceiveError(message = error.localizedDescription, cause = error.toException()),
                         ),
                     )
                 } else {
@@ -205,10 +175,8 @@ internal class IosNfcTag(
                             ),
                         ),
                     )
-                } else if (ndefMessage == null) {
-                    cont.resume(null)
                 } else {
-                    cont.resume(ndefMessage.toKmpNdefMessage())
+                    cont.resume(ndefMessage?.toKmpNdefMessage())
                 }
             }
         }
@@ -216,23 +184,23 @@ internal class IosNfcTag(
     private suspend fun writeNdefMessage(
         ndef: NFCNDEFTagProtocol,
         message: NdefMessage,
-    ) = suspendCoroutine { cont ->
-        val nfcNdefMessage = message.toIosNdefMessage()
-        ndef.writeNDEF(nfcNdefMessage) { error ->
-            if (error != null) {
-                cont.resumeWithException(
-                    NfcException(
-                        com.atruedev.kmpnfc.error.NdefFormatError(
-                            message = error.localizedDescription,
-                            cause = error.toException(),
+    ): Unit =
+        suspendCoroutine { cont ->
+            ndef.writeNDEF(message.toIosNdefMessage()) { error ->
+                if (error != null) {
+                    cont.resumeWithException(
+                        NfcException(
+                            com.atruedev.kmpnfc.error.NdefFormatError(
+                                message = error.localizedDescription,
+                                cause = error.toException(),
+                            ),
                         ),
-                    ),
-                )
-            } else {
-                cont.resume(Unit)
+                    )
+                } else {
+                    cont.resume(Unit)
+                }
             }
         }
-    }
 
     @OptIn(ExperimentalForeignApi::class)
     private suspend fun sendApduToIso7816(
@@ -240,23 +208,18 @@ internal class IosNfcTag(
         data: ByteArray,
     ): ByteArray =
         suspendCoroutine { cont ->
-            val nsData = data.toNSData()
             iso7816.sendCommandAPDU(
-                platform.CoreNFC.NFCISO7816APDU(nsData),
+                platform.CoreNFC.NFCISO7816APDU(data.toNSData()),
             ) { responseData, sw1, sw2, error ->
                 if (error != null) {
                     cont.resumeWithException(
                         NfcException(
-                            TransceiveError(
-                                message = error.localizedDescription,
-                                cause = error.toException(),
-                            ),
+                            TransceiveError(message = error.localizedDescription, cause = error.toException()),
                         ),
                     )
                 } else {
-                    val responseBytes = responseData?.toByteArray() ?: byteArrayOf()
-                    val result = responseBytes + byteArrayOf(sw1.toByte(), sw2.toByte())
-                    cont.resume(result)
+                    val response = responseData?.toByteArray() ?: byteArrayOf()
+                    cont.resume(response + byteArrayOf(sw1.toByte(), sw2.toByte()))
                 }
             }
         }
@@ -271,10 +234,7 @@ internal class IosNfcTag(
                 if (error != null) {
                     cont.resumeWithException(
                         NfcException(
-                            TransceiveError(
-                                message = error.localizedDescription,
-                                cause = error.toException(),
-                            ),
+                            TransceiveError(message = error.localizedDescription, cause = error.toException()),
                         ),
                     )
                 } else {
