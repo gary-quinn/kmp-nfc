@@ -15,4 +15,15 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
-[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/main...HEAD
+## [0.0.1] - 2026-04-05
+
+### Added
+- feat(shared): add kmp-nfc core with reader, NDEF codec, and testing module
+
+### Other
+- docs: add README, CHANGELOG, ARCHITECTURE, llms.txt, and release automation
+
+
+---
+
+[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.1...HEAD
