@@ -159,7 +159,7 @@ val tag = fakeNfcTag {
 | `NfcCapabilities` over lowest-common-denominator | NFC platform asymmetry is too severe to hide. iOS lacks MIFARE Classic, Android lacks background read. Developers must query capabilities. |
 | Cold `Flow<NfcTag>` over callback | Collecting starts the session, cancelling ends it. Structured concurrency manages the lifecycle. |
 | `limitedParallelism(1)` over AtomicInt | Project-wide policy from kmp-ble/kmp-uwb. Coroutine serialization is more composable than atomics. |
-| No HCE in v0.1 | Interface-only APIs with no implementation are vaporware. HCE ships when both Android and iOS implementations exist. |
+| No HCE in v0.1 | Interface-only APIs with no implementation are vaporware. HCE ships when both Android and iOS implementations exist. `ApduCommand`/`ApduResponse` remain in `tag/` — they're caller-side helpers for parsing `transceive()` responses, not HCE infrastructure. |
 | `NFCTagProtocol` typed constructor | The delegate callback delivers `List<*>` — casting happens at the call site where context is clear, not deferred into the tag class. |
 | Shared `parseNdefRecord()` | DRY: one function in commonMain, both platforms extract (tnf, type, payload) and delegate. |
 | `NfcException` as regular class | Exceptions use identity equality. `data class` generates `equals`/`hashCode`/`copy` that are semantically wrong for exceptions. |
