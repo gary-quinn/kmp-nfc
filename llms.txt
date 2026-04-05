@@ -1,0 +1,171 @@
+# kmp-nfc
+
+> Kotlin Multiplatform NFC library for Android & iOS — tag reading, NDEF, raw APDU transceive.
+
+## What is kmp-nfc?
+
+kmp-nfc is a Kotlin Multiplatform NFC library. It provides a coroutine-based API for NFC tag communication across Android (API 33+) and iOS (15+) from shared Kotlin code.
+
+Part of the wireless trifecta: kmp-ble (BLE) + kmp-uwb (UWB) + kmp-nfc (NFC), forming the foundation for an Aliro smart lock SDK.
+
+## Installation
+
+Maven Central group: `com.atruedev`
+
+```kotlin
+// build.gradle.kts
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation("com.atruedev:kmp-nfc:0.1.0")
+        }
+    }
+}
+```
+
+Android initialization (automatic via AndroidX App Startup):
+
+```kotlin
+// Manual init (optional — auto-init is default)
+class MyApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        KmpNfc.init(this)
+    }
+}
+```
+
+iOS via Swift Package Manager:
+
+```
+https://github.com/gary-quinn/kmp-nfc
+```
+
+## Core Features
+
+### Tag Discovery
+
+```kotlin
+val adapter = NfcAdapter()
+
+adapter.tags(ReaderOptions(alertMessage = "Hold near tag")).collect { tag ->
+    val ndef = tag.readNdef()
+    println("Records: ${ndef?.records}")
+    tag.close()
+}
+```
+
+### NDEF Read/Write
+
+```kotlin
+// Read
+val ndef = tag.readNdef()
+ndef?.records?.forEach { record ->
+    when (record) {
+        is NdefRecord.Uri -> println("URL: ${record.uri}")
+        is NdefRecord.Text -> println("Text: ${record.text} (${record.locale})")
+        is NdefRecord.MimeMedia -> println("MIME: ${record.mimeType}")
+        is NdefRecord.ExternalType -> println("External: ${record.domain}:${record.externalType}")
+        is NdefRecord.Unknown -> println("Unknown TNF: ${record.tnf}")
+    }
+}
+
+// Write
+val message = ndefMessage {
+    uri("https://github.com/gary-quinn/kmp-nfc")
+    text("Hello NFC", locale = "en")
+    mimeMedia("application/json", """{"key": "value"}""".encodeToByteArray())
+}
+tag.writeNdef(message)
+```
+
+### Raw APDU Transceive
+
+```kotlin
+// ISO 7816-4 SELECT command
+val selectAid = byteArrayOf(0x00, 0xA4.toByte(), 0x04, 0x00, 0x07) +
+    byteArrayOf(0xA0.toByte(), 0x00, 0x00, 0x00, 0x04, 0x10, 0x10)
+val response = tag.transceive(selectAid)
+// response = data + SW1 + SW2
+
+// Parse APDU
+val cmd = ApduCommand.fromBytes(rawBytes)
+val resp = ApduResponse.success(data = byteArrayOf(0x01))
+```
+
+### Adapter State and Capabilities
+
+```kotlin
+val adapter = NfcAdapter()
+
+adapter.state.collect { state ->
+    when (state) {
+        NfcAdapterState.ON -> println("NFC ready")
+        NfcAdapterState.OFF -> println("NFC disabled")
+        NfcAdapterState.NOT_SUPPORTED -> println("No hardware")
+        NfcAdapterState.UNAUTHORIZED -> println("Permission denied")
+    }
+}
+
+val caps = adapter.capabilities
+println("Read NDEF: ${caps.canReadNdef}")
+println("Write NDEF: ${caps.canWriteNdef}")
+println("Raw transceive: ${caps.canReadRawTag}")
+println("Background: ${caps.canBackgroundRead}")
+println("Tag types: ${caps.supportedTagTypes}")
+```
+
+### Testing Without Hardware
+
+```kotlin
+val adapter = FakeNfcAdapter()
+val tag = fakeNfcTag {
+    identifier(byteArrayOf(0x04, 0x12, 0x34, 0x56))
+    type(TagType.ISO_DEP)
+    ndef(ndefMessage { uri("https://example.com") })
+    onTransceive { command -> byteArrayOf(0x90.toByte(), 0x00) }
+    respondAfter(100.milliseconds)
+}
+
+// Emit to collectors
+adapter.emitTag(tag)
+
+// Error injection
+val failingTag = fakeNfcTag { failWith(TagLost()) }
+
+// State simulation
+adapter.simulateDisabled()
+adapter.simulateEnabled()
+```
+
+## Error Handling
+
+```kotlin
+try {
+    tag.readNdef()
+} catch (e: NfcException) {
+    when (e.error) {
+        is TagLost -> println("Tag moved away")
+        is ReadOnly -> println("Cannot write")
+        is UnsupportedOperation -> println("Not supported: ${e.error.operation}")
+        is TransceiveError -> println("Communication failed")
+        else -> println("Error: ${e.error.message}")
+    }
+}
+```
+
+## Architecture
+
+- Cold `Flow<NfcTag>` — collecting starts session, cancelling ends it
+- Per-tag serial execution via `limitedParallelism(1)` — no locks or atomics
+- Shared NDEF codec in commonMain — both platforms delegate to `parseNdefRecord()`
+- Sealed error hierarchy with composable interfaces (`AdapterError`, `TagOperationError`)
+- Capability-aware API — platform asymmetry exposed, not hidden
+
+## Links
+
+- GitHub: https://github.com/gary-quinn/kmp-nfc
+- API Docs: https://gary-quinn.github.io/kmp-nfc/
+- Maven Central: https://central.sonatype.com/artifact/com.atruedev/kmp-nfc
+- Ecosystem: [kmp-ble](https://github.com/gary-quinn/kmp-ble), [kmp-uwb](https://github.com/gary-quinn/kmp-uwb)
+- License: Apache 2.0
