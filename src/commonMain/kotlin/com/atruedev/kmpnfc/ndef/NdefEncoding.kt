@@ -1,5 +1,8 @@
 package com.atruedev.kmpnfc.ndef
 
+import com.atruedev.kmpnfc.error.NdefFormatError
+import com.atruedev.kmpnfc.error.NfcException
+
 /**
  * URI prefix codes defined by the NFC Forum URI RTD specification.
  * Index 0 = no prefix, index 1 = "http://www.", etc.
@@ -71,7 +74,11 @@ internal fun encodeTextPayload(
     encoding: NdefTextEncoding,
 ): ByteArray {
     val localeBytes = locale.encodeToByteArray()
-    val textBytes = text.encodeToByteArray()
+    val textBytes =
+        when (encoding) {
+            NdefTextEncoding.UTF_8 -> text.encodeToByteArray()
+            NdefTextEncoding.UTF_16 -> encodeUtf16Be(text)
+        }
     val statusByte =
         when (encoding) {
             NdefTextEncoding.UTF_8 -> localeBytes.size.toByte()
@@ -87,7 +94,33 @@ internal fun decodeTextPayload(payload: ByteArray): Triple<String, String, NdefT
     val localeLength = status and 0x3F
     val locale = payload.copyOfRange(1, 1 + localeLength).decodeToString()
     val textBytes = payload.copyOfRange(1 + localeLength, payload.size)
-    val text = textBytes.decodeToString()
+    val text = if (isUtf16) decodeUtf16Be(textBytes) else textBytes.decodeToString()
     val encoding = if (isUtf16) NdefTextEncoding.UTF_16 else NdefTextEncoding.UTF_8
     return Triple(text, locale, encoding)
+}
+
+private const val UTF16_BOM = '\uFEFF'
+
+private fun encodeUtf16Be(text: String): ByteArray {
+    val chars = text.toCharArray()
+    val bytes = ByteArray(chars.size * 2)
+    for (i in chars.indices) {
+        val code = chars[i].code
+        bytes[i * 2] = (code shr 8).toByte()
+        bytes[i * 2 + 1] = (code and 0xFF).toByte()
+    }
+    return bytes
+}
+
+private fun decodeUtf16Be(bytes: ByteArray): String {
+    if (bytes.size % 2 != 0) {
+        throw NfcException(NdefFormatError("UTF-16BE requires even byte count, got ${bytes.size}"))
+    }
+    val chars = CharArray(bytes.size / 2)
+    for (i in chars.indices) {
+        chars[i] = ((bytes[i * 2].toInt() and 0xFF shl 8) or (bytes[i * 2 + 1].toInt() and 0xFF)).toChar()
+    }
+    val decoded = chars.concatToString()
+    // Strip BOM if present — U+FEFF as literal content is indistinguishable and will be lost.
+    return if (decoded.startsWith(UTF16_BOM)) decoded.substring(1) else decoded
 }
