@@ -28,10 +28,13 @@ public enum class TagType {
 
     /** NXP MIFARE Ultralight — Android only, proprietary. */
     MIFARE_ULTRALIGHT,
+
+    /** Unrecognized tag technology reported by the platform. */
+    UNKNOWN,
     ;
 
     public companion object {
-        /** All defined tag types. */
-        public val all: Set<TagType> = entries.toSet()
+        /** Tag types that can be polled for. Excludes [UNKNOWN]. */
+        public val pollable: Set<TagType> = entries.toSet() - UNKNOWN
     }
 }
