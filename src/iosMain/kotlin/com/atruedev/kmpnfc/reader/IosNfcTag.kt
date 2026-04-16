@@ -34,6 +34,7 @@ import platform.Foundation.NSData
 import platform.Foundation.NSError
 import platform.Foundation.create
 import platform.posix.memcpy
+import kotlin.concurrent.Volatile
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
@@ -41,8 +42,9 @@ import kotlin.coroutines.suspendCoroutine
 /**
  * iOS NFC tag wrapping a Core NFC [NFCTagProtocol].
  *
- * All mutable state (`connected`) is accessed exclusively through [tagDispatcher]
- * (`limitedParallelism(1)`), eliminating the need for locks or atomics.
+ * All mutable connection state is confined to [tagDispatcher] (`limitedParallelism(1)`).
+ * [closed] is the only field written by [close] from an arbitrary thread — marked
+ * `@Volatile` so the dispatcher-bound operations see it immediately.
  */
 internal class IosNfcTag(
     private val tag: NFCTagProtocol,
@@ -55,7 +57,11 @@ internal class IosNfcTag(
     private val mifareTag = tag as? NFCMiFareTagProtocol
     private val ndefTag = tag as? NFCNDEFTagProtocol
 
+    /** Only accessed from [tagDispatcher]. */
     private var connected = false
+
+    @Volatile
+    private var closed = false
 
     override val identifier: ByteArray = resolveIdentifier()
 
@@ -95,9 +101,12 @@ internal class IosNfcTag(
             throw NfcException(UnsupportedOperation("transceive — unsupported tag type on iOS"))
         }
 
-    override fun close() = Unit
+    override fun close() {
+        closed = true
+    }
 
     private suspend fun ensureConnected() {
+        if (closed) throw NfcException(TagLost("Tag has been closed"))
         if (connected) return
         suspendCoroutine { cont ->
             session.connectToTag(tag) { error ->
@@ -124,7 +133,7 @@ internal class IosNfcTag(
             mifareTag != null -> TagType.NFC_A
             iso15693Tag != null -> TagType.NFC_V
             felicaTag != null -> TagType.NFC_F
-            else -> TagType.NFC_A
+            else -> TagType.UNKNOWN
         }
 
     private fun resolveTechnologies(): Set<TagTechnology> =
