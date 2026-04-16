@@ -33,7 +33,7 @@ public interface NfcAdapter : AutoCloseable {
      * Discover NFC tags. Cold Flow — collecting starts the reader session.
      *
      * On iOS, this displays the system NFC sheet with [ReaderOptions.alertMessage].
-     * The session auto-closes when the flow is cancelled or [ReaderOptions.timeout] elapses.
+     * The session auto-closes when the flow is cancelled.
      *
      * Each emitted [NfcTag] must be [closed][NfcTag.close] after use.
      */

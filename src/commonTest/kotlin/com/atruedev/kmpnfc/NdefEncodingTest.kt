@@ -1,5 +1,6 @@
 package com.atruedev.kmpnfc
 
+import com.atruedev.kmpnfc.error.NfcException
 import com.atruedev.kmpnfc.ndef.NdefTextEncoding
 import com.atruedev.kmpnfc.ndef.decodeTextPayload
 import com.atruedev.kmpnfc.ndef.decodeUriPayload
@@ -7,6 +8,8 @@ import com.atruedev.kmpnfc.ndef.encodeTextPayload
 import com.atruedev.kmpnfc.ndef.encodeUriPayload
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class NdefEncodingTest {
@@ -117,6 +120,92 @@ class NdefEncodingTest {
         assertEquals("", text)
         assertEquals("en", locale)
         assertEquals(NdefTextEncoding.UTF_8, encoding)
+    }
+
+    @Test
+    fun textEncodeUtf16ProducesCorrectBytes() {
+        val payload = encodeTextPayload("A", "en", NdefTextEncoding.UTF_16)
+        // status(1) + "en"(2) + UTF-16BE "A"(2) = 5 bytes
+        assertEquals(5, payload.size)
+        val textStart = 1 + 2 // skip status + locale
+        // UTF-16BE for 'A' (U+0041) = 0x00, 0x41
+        assertEquals(0x00, payload[textStart].toInt() and 0xFF)
+        assertEquals(0x41, payload[textStart + 1].toInt() and 0xFF)
+    }
+
+    @Test
+    fun textDecodeUtf16FromRealPayload() {
+        // Manually construct UTF-16BE payload: status=0x82 (UTF-16, locale len 2), "en", UTF-16BE "Hi"
+        val status = 0x82.toByte() // UTF-16 flag + locale length 2
+        val locale = "en".encodeToByteArray()
+        val textUtf16Be = byteArrayOf(0x00, 0x48, 0x00, 0x69) // "Hi" in UTF-16BE
+        val payload = byteArrayOf(status) + locale + textUtf16Be
+
+        val (text, decodedLocale, encoding) = decodeTextPayload(payload)
+        assertEquals("Hi", text)
+        assertEquals("en", decodedLocale)
+        assertEquals(NdefTextEncoding.UTF_16, encoding)
+    }
+
+    @Test
+    fun textRoundtripUtf16CJK() {
+        val original = "漢字"
+        val payload = encodeTextPayload(original, "zh", NdefTextEncoding.UTF_16)
+        // Text portion should be 2 chars * 2 bytes = 4 bytes for BMP characters
+        val textStart = 1 + 2 // status + "zh"
+        assertEquals(4, payload.size - textStart)
+        val (text, locale, encoding) = decodeTextPayload(payload)
+        assertEquals(original, text)
+        assertEquals("zh", locale)
+        assertEquals(NdefTextEncoding.UTF_16, encoding)
+    }
+
+    @Test
+    fun textRoundtripUtf16SurrogatePair() {
+        // U+1F600 (😀) is a supplementary character — stored as 2 surrogate chars in Kotlin,
+        // producing 4 bytes in UTF-16BE (D83D DE00).
+        val original = "\uD83D\uDE00"
+        val payload = encodeTextPayload(original, "en", NdefTextEncoding.UTF_16)
+        val textStart = 1 + 2 // status + "en"
+        assertEquals(4, payload.size - textStart)
+        val (text, locale, encoding) = decodeTextPayload(payload)
+        assertEquals(original, text)
+        assertEquals("en", locale)
+        assertEquals(NdefTextEncoding.UTF_16, encoding)
+    }
+
+    @Test
+    fun textRoundtripUtf16EmptyString() {
+        val payload = encodeTextPayload("", "en", NdefTextEncoding.UTF_16)
+        val (text, locale, encoding) = decodeTextPayload(payload)
+        assertEquals("", text)
+        assertEquals("en", locale)
+        assertEquals(NdefTextEncoding.UTF_16, encoding)
+    }
+
+    @Test
+    fun textDecodeUtf16WithBomStripsIt() {
+        // Some writers prepend BOM (0xFE 0xFF) to UTF-16BE text.
+        val status = 0x82.toByte() // UTF-16 flag + locale length 2
+        val locale = "en".encodeToByteArray()
+        val bom = byteArrayOf(0xFE.toByte(), 0xFF.toByte())
+        val textBytes = byteArrayOf(0x00, 0x41) // "A"
+        val payload = byteArrayOf(status) + locale + bom + textBytes
+
+        val (text, _, encoding) = decodeTextPayload(payload)
+        assertEquals("A", text)
+        assertEquals(NdefTextEncoding.UTF_16, encoding)
+    }
+
+    @Test
+    fun textDecodeUtf16OddByteCountThrowsNfcException() {
+        val status = 0x82.toByte()
+        val locale = "en".encodeToByteArray()
+        val oddBytes = byteArrayOf(0x00, 0x41, 0x00) // 3 bytes — invalid
+        val payload = byteArrayOf(status) + locale + oddBytes
+
+        val ex = assertFailsWith<NfcException> { decodeTextPayload(payload) }
+        assertIs<com.atruedev.kmpnfc.error.NdefFormatError>(ex.error)
     }
 
     @Test

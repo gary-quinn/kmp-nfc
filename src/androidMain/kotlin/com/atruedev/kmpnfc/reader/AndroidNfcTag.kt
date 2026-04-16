@@ -20,12 +20,23 @@ import com.atruedev.kmpnfc.ndef.TypeNameFormat
 import com.atruedev.kmpnfc.ndef.parseNdefRecord
 import com.atruedev.kmpnfc.tag.TagTechnology
 import com.atruedev.kmpnfc.tag.TagType
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import android.nfc.tech.TagTechnology as AndroidTagTech
 
+/**
+ * Android NFC tag using connect-once semantics.
+ *
+ * Mutable connection state ([connectedTech]) is confined to [tagDispatcher]
+ * (`limitedParallelism(1)`). [close] sets `@Volatile closed` from any thread and
+ * dispatches native tech cleanup onto [tagDispatcher] to avoid cross-thread mutation.
+ */
 internal class AndroidNfcTag(
     private val tag: Tag,
+    private val tagDispatcher: CoroutineDispatcher = Dispatchers.IO.limitedParallelism(1),
 ) : NfcTag {
     override val identifier: ByteArray = tag.id
 
@@ -33,32 +44,37 @@ internal class AndroidNfcTag(
 
     override val technologies: Set<TagTechnology> = tag.resolveTechnologies()
 
+    /** Only accessed from [tagDispatcher]. */
+    private var connectedTech: AndroidTagTech? = null
+
+    @Volatile
+    private var closed = false
+
     override suspend fun readNdef(): NdefMessage? =
-        withContext(Dispatchers.IO) {
+        withContext(tagDispatcher) {
             val ndef =
-                android.nfc.tech.Ndef
-                    .get(tag) ?: return@withContext null
+                ensureConnected(
+                    android.nfc.tech.Ndef
+                        .get(tag) ?: return@withContext null,
+                )
             try {
-                ndef.connect()
                 val ndefMessage = ndef.ndefMessage ?: return@withContext null
                 ndefMessage.toKmpNdefMessage()
             } catch (e: android.nfc.TagLostException) {
                 throw NfcException(TagLost(cause = e))
             } catch (e: java.io.IOException) {
                 throw NfcException(NdefFormatError(message = e.message ?: "NDEF read failed", cause = e))
-            } finally {
-                runCatching { ndef.close() }
             }
         }
 
     override suspend fun writeNdef(message: NdefMessage) =
-        withContext(Dispatchers.IO) {
-            val ndef =
+        withContext(tagDispatcher) {
+            val rawNdef =
                 android.nfc.tech.Ndef
                     .get(tag)
-            if (ndef != null) {
+            if (rawNdef != null) {
+                val ndef = ensureConnected(rawNdef)
                 try {
-                    ndef.connect()
                     if (!ndef.isWritable) throw NfcException(ReadOnly())
                     ndef.writeNdefMessage(message.toAndroidNdefMessage())
                 } catch (e: NfcException) {
@@ -67,16 +83,15 @@ internal class AndroidNfcTag(
                     throw NfcException(TagLost(cause = e))
                 } catch (e: java.io.IOException) {
                     throw NfcException(NdefFormatError(message = e.message ?: "NDEF write failed", cause = e))
-                } finally {
-                    runCatching { ndef.close() }
                 }
             } else {
                 val formatable =
-                    android.nfc.tech.NdefFormatable
-                        .get(tag)
-                        ?: throw NfcException(UnsupportedOperation("writeNdef"))
+                    ensureConnected(
+                        android.nfc.tech.NdefFormatable
+                            .get(tag)
+                            ?: throw NfcException(UnsupportedOperation("writeNdef")),
+                    )
                 try {
-                    formatable.connect()
                     formatable.format(message.toAndroidNdefMessage())
                 } catch (e: NfcException) {
                     throw e
@@ -84,19 +99,18 @@ internal class AndroidNfcTag(
                     throw NfcException(TagLost(cause = e))
                 } catch (e: java.io.IOException) {
                     throw NfcException(NdefFormatError(message = e.message ?: "NDEF format failed", cause = e))
-                } finally {
-                    runCatching { formatable.close() }
                 }
             }
         }
 
     override suspend fun transceive(data: ByteArray): ByteArray =
-        withContext(Dispatchers.IO) {
+        withContext(tagDispatcher) {
             val tech =
-                resolveTransceiveTech()
-                    ?: throw NfcException(UnsupportedOperation("transceive"))
+                ensureConnected(
+                    resolveTransceiveTech()
+                        ?: throw NfcException(UnsupportedOperation("transceive")),
+                )
             try {
-                tech.connect()
                 transceiveWith(tech, data)
             } catch (e: NfcException) {
                 throw e
@@ -104,13 +118,29 @@ internal class AndroidNfcTag(
                 throw NfcException(TagLost(cause = e))
             } catch (e: java.io.IOException) {
                 throw NfcException(TransceiveError(message = e.message ?: "Transceive failed", cause = e))
-            } finally {
-                runCatching { tech.close() }
             }
         }
 
     override fun close() {
-        // Tag resources are cleaned up per-operation via tech.close() in each method.
+        closed = true
+        CoroutineScope(tagDispatcher).launch {
+            connectedTech?.let { runCatching { it.close() } }
+            connectedTech = null
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : AndroidTagTech> ensureConnected(tech: T): T {
+        if (closed) throw NfcException(TagLost("Tag has been closed"))
+        val current = connectedTech
+        if (current != null && current.javaClass == tech.javaClass && current.isConnected) {
+            return current as T
+        }
+        connectedTech = null
+        current?.let { runCatching { it.close() } }
+        tech.connect()
+        connectedTech = tech
+        return tech
     }
 
     private fun resolveTransceiveTech(): AndroidTagTech? =
@@ -165,7 +195,6 @@ private fun NdefRecord.toAndroidNdefRecord(): android.nfc.NdefRecord {
             TypeNameFormat.UNKNOWN -> android.nfc.NdefRecord.TNF_UNKNOWN
             TypeNameFormat.UNCHANGED -> android.nfc.NdefRecord.TNF_UNCHANGED
         }
-    // NDEF record ID is not modeled in kmp-nfc — it's optional per the NFC Forum spec
-    // and unused by the vast majority of tags. If needed, add an id field to NdefRecord.
+    // NDEF record ID is not modeled — optional per NFC Forum spec, rarely used in practice.
     return android.nfc.NdefRecord(tnfValue, type, byteArrayOf(), payload)
 }

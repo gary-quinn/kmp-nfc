@@ -28,7 +28,7 @@ kotlin {
             implementation("com.atruedev:kmp-nfc:0.0.2")
 
             // Optional: test doubles for unit testing
-            // testImplementation("com.atruedev:kmp-nfc-testing:0.1.0")
+            // testImplementation("com.atruedev:kmp-nfc-testing:0.0.2")
         }
     }
 }
@@ -178,7 +178,7 @@ Together these form the foundation for an Aliro SDK — the CSA smart lock stand
 ## Requirements
 
 - Kotlin 2.3.20+
-- Android minSdk 33
+- Android minSdk 21
 - iOS 15+
 - kotlinx-coroutines 1.10+
 

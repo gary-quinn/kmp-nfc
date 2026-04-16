@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -89,5 +90,55 @@ class NfcTagTest {
         assertTrue(tag.identifier.contentEquals(byteArrayOf(0x01, 0x02, 0x03, 0x04)))
         assertEquals(TagType.ISO_DEP, tag.type)
         assertTrue(TagTechnology.ISO_DEP in tag.technologies)
+    }
+
+    @Test
+    fun closePreventsRead() =
+        runTest {
+            val tag = FakeNfcTag(ndefMessage = ndefMessage { uri("https://example.com") })
+            tag.readNdef()
+            tag.close()
+            val ex = assertFailsWith<NfcException> { tag.readNdef() }
+            assertIs<TagLost>(ex.error)
+        }
+
+    @Test
+    fun closePreventsWrite() =
+        runTest {
+            val tag = FakeNfcTag()
+            tag.close()
+            val ex = assertFailsWith<NfcException> { tag.writeNdef(ndefMessage { text("x") }) }
+            assertIs<TagLost>(ex.error)
+        }
+
+    @Test
+    fun closePreventsTransceive() =
+        runTest {
+            val tag = fakeNfcTag { onTransceive { byteArrayOf(0x90.toByte(), 0x00) } }
+            tag.close()
+            val ex = assertFailsWith<NfcException> { tag.transceive(byteArrayOf(0x00)) }
+            assertIs<TagLost>(ex.error)
+        }
+
+    @Test
+    fun closeIsIdempotent() {
+        val tag = FakeNfcTag()
+        tag.close()
+        tag.close()
+        assertTrue(tag.isClosed)
+    }
+
+    @Test
+    fun isClosedReflectsState() {
+        val tag = FakeNfcTag()
+        assertFalse(tag.isClosed)
+        tag.close()
+        assertTrue(tag.isClosed)
+    }
+
+    @Test
+    fun unknownExcludedFromPollable() {
+        assertFalse(TagType.UNKNOWN in TagType.pollable)
+        assertTrue(TagType.NFC_A in TagType.pollable)
     }
 }

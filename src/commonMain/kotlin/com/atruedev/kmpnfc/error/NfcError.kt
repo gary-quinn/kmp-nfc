@@ -39,6 +39,12 @@ public data class Unauthorized(
     override val cause: Throwable? = null,
 ) : AdapterError
 
+/** NFC reader mode requires a foreground Activity. Only thrown on Android. */
+public data class NoForegroundActivity(
+    override val message: String = "NFC reader mode requires a resumed Activity in the foreground",
+    override val cause: Throwable? = null,
+) : AdapterError
+
 /** Tag was lost during operation (moved away from reader). */
 public data class TagLost(
     override val message: String = "Tag connection lost",
