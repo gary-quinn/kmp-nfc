@@ -36,5 +36,13 @@ public interface NfcTag : AutoCloseable {
      */
     public suspend fun transceive(data: ByteArray): ByteArray
 
+    /**
+     * Mark this tag as closed. Subsequent operations throw [com.atruedev.kmpnfc.error.TagLost].
+     *
+     * On Android the native tech connection is released asynchronously on the tag dispatcher.
+     * On iOS, CoreNFC releases connections when the NFCTagReaderSession invalidates.
+     *
+     * Idempotent — safe to call multiple times.
+     */
     override fun close()
 }

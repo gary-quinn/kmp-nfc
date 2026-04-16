@@ -2,6 +2,7 @@ package com.atruedev.kmpnfc.testing
 
 import com.atruedev.kmpnfc.error.NfcError
 import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.TagLost
 import com.atruedev.kmpnfc.ndef.NdefMessage
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.tag.TagTechnology
@@ -33,23 +34,30 @@ public class FakeNfcTag(
     private val responseDelay: Duration = Duration.ZERO,
 ) : NfcTag {
     private val writtenMessages = mutableListOf<NdefMessage>()
+    private var closed = false
+
+    /** Whether [close] has been called. */
+    public val isClosed: Boolean get() = closed
 
     /** Messages written to this tag via [writeNdef]. */
     public val writtenNdefMessages: List<NdefMessage> get() = writtenMessages.toList()
 
     override suspend fun readNdef(): NdefMessage? {
+        ensureOpen()
         maybeDelay()
         maybeThrow()
         return ndefMessage
     }
 
     override suspend fun writeNdef(message: NdefMessage) {
+        ensureOpen()
         maybeDelay()
         maybeThrow()
         writtenMessages.add(message)
     }
 
     override suspend fun transceive(data: ByteArray): ByteArray {
+        ensureOpen()
         maybeDelay()
         maybeThrow()
         return transceiveHandler?.invoke(data)
@@ -59,7 +67,13 @@ public class FakeNfcTag(
             )
     }
 
-    override fun close(): Unit = Unit
+    override fun close() {
+        closed = true
+    }
+
+    private fun ensureOpen() {
+        if (closed) throw NfcException(TagLost("Tag has been closed"))
+    }
 
     private suspend fun maybeDelay() {
         if (responseDelay > Duration.ZERO) delay(responseDelay)
