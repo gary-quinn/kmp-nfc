@@ -10,8 +10,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "KmpNfc",
-            url: "https://github.com/gary-quinn/kmp-nfc/releases/download/v0.0.2/KmpNfc.xcframework.zip",
-            checksum: "cad64c3a5f5148817986ca6e76b20e1c0091f5106eb8c130b4795ae8214a0792"
+            url: "https://github.com/gary-quinn/kmp-nfc/releases/download/v0.0.3/KmpNfc.xcframework.zip",
+            checksum: "6045f9ed58fad295f5821010b5f1c559328531061b2b8999c6b05a45b7023836"
         ),
     ]
 )
