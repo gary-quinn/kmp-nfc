@@ -16,6 +16,8 @@ import android.nfc.tech.NfcV
 import android.os.Bundle
 import com.atruedev.kmpnfc.error.AdapterDisabled
 import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.NoForegroundActivity
+import com.atruedev.kmpnfc.error.NotSupported
 import com.atruedev.kmpnfc.reader.AndroidNfcTag
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.reader.ReaderOptions
@@ -60,11 +62,12 @@ internal class AndroidNfcAdapter(
 
     override fun tags(options: ReaderOptions): Flow<NfcTag> =
         callbackFlow {
+            val adapter = androidAdapter ?: throw NfcException(NotSupported())
+            if (!adapter.isEnabled) throw NfcException(AdapterDisabled())
+
             val activity =
                 ActivityTracker.resumedActivity
-                    ?: throw NfcException(
-                        AdapterDisabled("NFC reader mode requires a resumed Activity in the foreground"),
-                    )
+                    ?: throw NfcException(NoForegroundActivity())
 
             var flags = 0
             if (TagType.NFC_A in options.pollingTypes) flags = flags or android.nfc.NfcAdapter.FLAG_READER_NFC_A
@@ -74,7 +77,7 @@ internal class AndroidNfcAdapter(
 
             if (flags == 0) flags = android.nfc.NfcAdapter.FLAG_READER_NFC_A
 
-            androidAdapter?.enableReaderMode(
+            adapter.enableReaderMode(
                 activity,
                 { tag: Tag -> trySend(AndroidNfcTag(tag)) },
                 flags,
@@ -82,7 +85,7 @@ internal class AndroidNfcAdapter(
             )
 
             awaitClose {
-                androidAdapter?.disableReaderMode(activity)
+                adapter.disableReaderMode(activity)
             }
         }
 
@@ -131,7 +134,7 @@ internal fun Tag.resolveTagType(): TagType =
         techList.contains(NfcV::class.java.name) -> TagType.NFC_V
         techList.contains(MifareClassic::class.java.name) -> TagType.MIFARE_CLASSIC
         techList.contains(MifareUltralight::class.java.name) -> TagType.MIFARE_ULTRALIGHT
-        else -> TagType.NFC_A
+        else -> TagType.UNKNOWN
     }
 
 internal fun Tag.resolveTechnologies(): Set<TagTechnology> =
