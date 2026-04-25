@@ -27,7 +27,7 @@ jvmMain/        JvmNfcAdapter (stub)
 
 ### Per-Tag Serial Execution
 
-NFC tag operations must be serialized — sending a second command while the first is in-flight corrupts the protocol. Each `IosNfcTag` owns a `limitedParallelism(1)` dispatcher:
+NFC tag operations must be serialized - sending a second command while the first is in-flight corrupts the protocol. Each `IosNfcTag` owns a `limitedParallelism(1)` dispatcher:
 
 ```kotlin
 internal class IosNfcTag(
@@ -39,7 +39,7 @@ internal class IosNfcTag(
 
 Every public operation (`readNdef`, `writeNdef`, `transceive`) dispatches through `withContext(tagDispatcher)`, guaranteeing at most one operation runs at a time per tag. No locks, no atomics, no mutex.
 
-On Android, tag operations dispatch to `Dispatchers.IO` because the Android NFC SDK uses blocking I/O internally. Each operation opens a tech connection, performs the operation, and closes it — serialization is inherent in the connect/close lifecycle.
+On Android, tag operations dispatch to `Dispatchers.IO` because the Android NFC SDK uses blocking I/O internally. Each operation opens a tech connection, performs the operation, and closes it - serialization is inherent in the connect/close lifecycle.
 
 ### Tag Discovery Flow
 
@@ -56,14 +56,14 @@ Collect starts  →  Platform session begins  →  Tags emitted  →  Cancel col
 
 ## iOS Session Lifecycle
 
-Core NFC requires a modal `NFCTagReaderSession` — the system displays an NFC reading sheet. Key constraints:
+Core NFC requires a modal `NFCTagReaderSession` - the system displays an NFC reading sheet. Key constraints:
 
 1. Only one session at a time
 2. Session auto-invalidates after ~60 seconds or user dismissal
 3. `connectToTag` must be called before any tag operation
 4. A connected tag cannot be reconnected
 
-`IosNfcTag.ensureConnected()` handles lazy connection — connects on first operation, no-ops on subsequent calls. The `connected` flag is safe because all access is serialized through `tagDispatcher`.
+`IosNfcTag.ensureConnected()` handles lazy connection - connects on first operation, no-ops on subsequent calls. The `connected` flag is safe because all access is serialized through `tagDispatcher`.
 
 When the session invalidates (timeout, user dismissal, system event), the delegate calls `close(NfcException(SessionInvalidated(...)))` so flow collectors receive the reason.
 
@@ -74,7 +74,7 @@ When the session invalidates (timeout, user dismissal, system event), the delega
 NDEF encoding/decoding is shared in `commonMain`. Both platform implementations map their native NDEF types to `TypeNameFormat` + raw bytes, then delegate to a single function:
 
 ```kotlin
-// commonMain — single source of truth for NDEF parsing
+// commonMain - single source of truth for NDEF parsing
 internal fun parseNdefRecord(
     tnf: TypeNameFormat,
     type: ByteArray,
@@ -111,7 +111,7 @@ NfcError
 
 All errors carry `message` and `cause`. `NfcException` wraps `NfcError` as a throwable, chaining `error.cause` into `Exception(message, cause)` so platform stack traces are preserved.
 
-`NfcException` is deliberately not a data class — exceptions use identity equality, not structural equality.
+`NfcException` is deliberately not a data class - exceptions use identity equality, not structural equality.
 
 ---
 
@@ -159,8 +159,8 @@ val tag = fakeNfcTag {
 | `NfcCapabilities` over lowest-common-denominator | NFC platform asymmetry is too severe to hide. iOS lacks MIFARE Classic, Android lacks background read. Developers must query capabilities. |
 | Cold `Flow<NfcTag>` over callback | Collecting starts the session, cancelling ends it. Structured concurrency manages the lifecycle. |
 | `limitedParallelism(1)` over AtomicInt | Project-wide policy from kmp-ble/kmp-uwb. Coroutine serialization is more composable than atomics. |
-| No HCE in v0.1 | Interface-only APIs with no implementation are vaporware. HCE ships when both Android and iOS implementations exist. `ApduCommand`/`ApduResponse` remain in `tag/` — they're caller-side helpers for parsing `transceive()` responses, not HCE infrastructure. |
-| `NFCTagProtocol` typed constructor | The delegate callback delivers `List<*>` — casting happens at the call site where context is clear, not deferred into the tag class. |
+| No HCE in v0.1 | Interface-only APIs with no implementation are vaporware. HCE ships when both Android and iOS implementations exist. `ApduCommand`/`ApduResponse` remain in `tag/` - they're caller-side helpers for parsing `transceive()` responses, not HCE infrastructure. |
+| `NFCTagProtocol` typed constructor | The delegate callback delivers `List<*>` - casting happens at the call site where context is clear, not deferred into the tag class. |
 | Shared `parseNdefRecord()` | DRY: one function in commonMain, both platforms extract (tnf, type, payload) and delegate. |
 | `NfcException` as regular class | Exceptions use identity equality. `data class` generates `equals`/`hashCode`/`copy` that are semantically wrong for exceptions. |
 | No `ReaderOptions.timeout` | Neither platform enforced it. False promise removed. Callers use `withTimeout {}` at the collection site. |

@@ -22,9 +22,9 @@ public enum class TypeNameFormat {
     /** NFC Forum external type (reverse domain notation). */
     EXTERNAL_TYPE,
 
-    /** Unknown record type — payload type is unknown. */
+    /** Unknown record type - payload type is unknown. */
     UNKNOWN,
 
-    /** Unchanged — used in chunked NDEF records. */
+    /** Unchanged - used in chunked NDEF records. */
     UNCHANGED,
 }

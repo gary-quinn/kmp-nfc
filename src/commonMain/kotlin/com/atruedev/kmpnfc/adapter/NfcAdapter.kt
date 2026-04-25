@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
  * Provides access to NFC adapter state, platform capabilities, and tag discovery.
  * Obtain an instance via the [NfcAdapter] factory function.
  *
- * The [tags] flow is cold — collecting starts a reader session, cancelling
+ * The [tags] flow is cold - collecting starts a reader session, cancelling
  * collection ends it. On iOS, this displays the system NFC reading sheet.
  *
  * ```
@@ -30,7 +30,7 @@ public interface NfcAdapter : AutoCloseable {
     public val capabilities: NfcCapabilities
 
     /**
-     * Discover NFC tags. Cold Flow — collecting starts the reader session.
+     * Discover NFC tags. Cold Flow - collecting starts the reader session.
      *
      * On iOS, this displays the system NFC sheet with [ReaderOptions.alertMessage].
      * The session auto-closes when the flow is cancelled.

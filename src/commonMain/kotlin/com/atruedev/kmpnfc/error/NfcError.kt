@@ -3,7 +3,7 @@ package com.atruedev.kmpnfc.error
 /**
  * Root of the composable NFC error hierarchy.
  *
- * Uses sealed interfaces to enable composable error handling —
+ * Uses sealed interfaces to enable composable error handling -
  * an error can implement multiple interfaces, allowing callers
  * to pattern-match at the granularity they need.
  *
@@ -76,7 +76,7 @@ public data class ReadOnly(
     override val cause: Throwable? = null,
 ) : TagOperationError
 
-/** Tag storage full — not enough space for NDEF message. */
+/** Tag storage full - not enough space for NDEF message. */
 public data class InsufficientSpace(
     override val message: String = "Tag does not have enough storage space",
     override val cause: Throwable? = null,
@@ -99,7 +99,7 @@ public data class Timeout(
  * Used by [com.atruedev.kmpnfc.testing.FakeNfcTag] error injection
  * and catchable in test assertions.
  *
- * Not a data class — exceptions use identity equality, not structural equality.
+ * Not a data class - exceptions use identity equality, not structural equality.
  */
 public class NfcException(
     public val error: NfcError,

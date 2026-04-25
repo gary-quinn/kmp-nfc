@@ -1,6 +1,6 @@
 # kmp-nfc
 
-> Kotlin Multiplatform NFC library for Android & iOS — tag reading, NDEF, raw APDU transceive.
+> Kotlin Multiplatform NFC library for Android & iOS - tag reading, NDEF, raw APDU transceive.
 
 ## What is kmp-nfc?
 
@@ -26,7 +26,7 @@ kotlin {
 Android initialization (automatic via AndroidX App Startup):
 
 ```kotlin
-// Manual init (optional — auto-init is default)
+// Manual init (optional - auto-init is default)
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
@@ -157,11 +157,11 @@ try {
 
 ## Architecture
 
-- Cold `Flow<NfcTag>` — collecting starts session, cancelling ends it
-- Per-tag serial execution via `limitedParallelism(1)` — no locks or atomics
-- Shared NDEF codec in commonMain — both platforms delegate to `parseNdefRecord()`
+- Cold `Flow<NfcTag>` - collecting starts session, cancelling ends it
+- Per-tag serial execution via `limitedParallelism(1)` - no locks or atomics
+- Shared NDEF codec in commonMain - both platforms delegate to `parseNdefRecord()`
 - Sealed error hierarchy with composable interfaces (`AdapterError`, `TagOperationError`)
-- Capability-aware API — platform asymmetry exposed, not hidden
+- Capability-aware API - platform asymmetry exposed, not hidden
 
 ## Links
 

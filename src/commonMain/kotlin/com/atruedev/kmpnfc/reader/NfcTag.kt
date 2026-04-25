@@ -42,7 +42,7 @@ public interface NfcTag : AutoCloseable {
      * On Android the native tech connection is released asynchronously on the tag dispatcher.
      * On iOS, CoreNFC releases connections when the NFCTagReaderSession invalidates.
      *
-     * Idempotent — safe to call multiple times.
+     * Idempotent - safe to call multiple times.
      */
     override fun close()
 }

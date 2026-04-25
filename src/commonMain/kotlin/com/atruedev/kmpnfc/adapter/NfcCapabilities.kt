@@ -6,7 +6,7 @@ import com.atruedev.kmpnfc.tag.TagType
  * Capabilities of the device's NFC hardware.
  *
  * Query before using features to avoid runtime surprises.
- * Platform asymmetry is significant — Android supports all features,
+ * Platform asymmetry is significant - Android supports all features,
  * while iOS support varies by version, region, and entitlement.
  */
 public data class NfcCapabilities(

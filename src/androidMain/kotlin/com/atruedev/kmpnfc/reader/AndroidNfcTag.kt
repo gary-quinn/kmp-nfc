@@ -195,6 +195,6 @@ private fun NdefRecord.toAndroidNdefRecord(): android.nfc.NdefRecord {
             TypeNameFormat.UNKNOWN -> android.nfc.NdefRecord.TNF_UNKNOWN
             TypeNameFormat.UNCHANGED -> android.nfc.NdefRecord.TNF_UNCHANGED
         }
-    // NDEF record ID is not modeled — optional per NFC Forum spec, rarely used in practice.
+    // NDEF record ID is not modeled - optional per NFC Forum spec, rarely used in practice.
     return android.nfc.NdefRecord(tnfValue, type, byteArrayOf(), payload)
 }

@@ -89,7 +89,7 @@ internal class IosNfcAdapter : NfcAdapter {
 
             awaitClose {
                 session.invalidateSession()
-                // NFCTagReaderSession holds its delegate weakly — prevent GC.
+                // NFCTagReaderSession holds its delegate weakly - prevent GC.
                 delegate.description()
             }
         }

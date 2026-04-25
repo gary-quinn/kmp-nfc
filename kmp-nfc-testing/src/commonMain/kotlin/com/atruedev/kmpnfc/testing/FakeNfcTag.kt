@@ -63,7 +63,7 @@ public class FakeNfcTag(
         return transceiveHandler?.invoke(data)
             ?: throw NfcException(
                 com.atruedev.kmpnfc.error
-                    .UnsupportedOperation("transceive — no handler configured"),
+                    .UnsupportedOperation("transceive - no handler configured"),
             )
     }
 
@@ -128,7 +128,7 @@ public class FakeNfcTagBuilder {
         transceiveHandler = handler
     }
 
-    /** Inject an error — all operations will throw [NfcException] with this error. */
+    /** Inject an error - all operations will throw [NfcException] with this error. */
     public fun failWith(nfcError: NfcError) {
         error = nfcError
     }
