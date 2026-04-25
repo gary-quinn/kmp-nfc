@@ -3,7 +3,7 @@ package com.atruedev.kmpnfc.ndef
 /**
  * Parse raw NDEF record fields into a typed [NdefRecord].
  *
- * Shared across Android and iOS — platform code maps platform TNF to [TypeNameFormat],
+ * Shared across Android and iOS - platform code maps platform TNF to [TypeNameFormat],
  * extracts type/payload bytes, then delegates here.
  */
 internal fun parseNdefRecord(

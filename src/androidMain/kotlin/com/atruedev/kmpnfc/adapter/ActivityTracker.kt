@@ -8,14 +8,14 @@ import java.lang.ref.WeakReference
 /**
  * Singleton that tracks the current resumed [Activity].
  *
- * Registered once at initialization via [KmpNfcInitializer] — never
+ * Registered once at initialization via [KmpNfcInitializer] - never
  * re-registered. Uses a [WeakReference] to avoid leaking activities.
  */
 internal object ActivityTracker : Application.ActivityLifecycleCallbacks {
     private var current: WeakReference<Activity>? = null
     private var registered = false
 
-    /** Register on the application. Idempotent — safe to call multiple times. */
+    /** Register on the application. Idempotent - safe to call multiple times. */
     fun install(application: Application) {
         if (registered) return
         registered = true

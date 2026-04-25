@@ -43,7 +43,7 @@ import kotlin.coroutines.suspendCoroutine
  * iOS NFC tag wrapping a Core NFC [NFCTagProtocol].
  *
  * All mutable connection state is confined to [tagDispatcher] (`limitedParallelism(1)`).
- * [closed] is the only field written by [close] from an arbitrary thread — marked
+ * [closed] is the only field written by [close] from an arbitrary thread - marked
  * `@Volatile` so the dispatcher-bound operations see it immediately.
  */
 internal class IosNfcTag(
@@ -84,7 +84,7 @@ internal class IosNfcTag(
             ensureConnected()
             val status = queryNdefStatus(ndef)
             if (status == NFCNDEFStatusNotSupported) {
-                throw NfcException(UnsupportedOperation("writeNdef — tag does not support NDEF"))
+                throw NfcException(UnsupportedOperation("writeNdef - tag does not support NDEF"))
             }
             if (status == NFCNDEFStatusReadOnly) {
                 throw NfcException(ReadOnly())
@@ -98,7 +98,7 @@ internal class IosNfcTag(
             ensureConnected()
             iso7816Tag?.let { return@withContext sendApduToIso7816(it, data) }
             mifareTag?.let { return@withContext sendDataToMiFare(it, data) }
-            throw NfcException(UnsupportedOperation("transceive — unsupported tag type on iOS"))
+            throw NfcException(UnsupportedOperation("transceive - unsupported tag type on iOS"))
         }
 
     override fun close() {

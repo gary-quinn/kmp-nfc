@@ -162,7 +162,7 @@ class NdefEncodingTest {
 
     @Test
     fun textRoundtripUtf16SurrogatePair() {
-        // U+1F600 (😀) is a supplementary character — stored as 2 surrogate chars in Kotlin,
+        // U+1F600 (😀) is a supplementary character - stored as 2 surrogate chars in Kotlin,
         // producing 4 bytes in UTF-16BE (D83D DE00).
         val original = "\uD83D\uDE00"
         val payload = encodeTextPayload(original, "en", NdefTextEncoding.UTF_16)
@@ -201,7 +201,7 @@ class NdefEncodingTest {
     fun textDecodeUtf16OddByteCountThrowsNfcException() {
         val status = 0x82.toByte()
         val locale = "en".encodeToByteArray()
-        val oddBytes = byteArrayOf(0x00, 0x41, 0x00) // 3 bytes — invalid
+        val oddBytes = byteArrayOf(0x00, 0x41, 0x00) // 3 bytes - invalid
         val payload = byteArrayOf(status) + locale + oddBytes
 
         val ex = assertFailsWith<NfcException> { decodeTextPayload(payload) }

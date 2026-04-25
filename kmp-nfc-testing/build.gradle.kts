@@ -32,7 +32,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // api: fakes implement interfaces from root module — consumers need those types on classpath
+            // api: fakes implement interfaces from root module - consumers need those types on classpath
             api(project(":"))
             implementation(libs.kotlinx.coroutines.core)
         }

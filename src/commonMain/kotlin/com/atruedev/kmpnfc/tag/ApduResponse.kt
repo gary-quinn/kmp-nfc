@@ -38,7 +38,7 @@ public data class ApduResponse(
         /** Wrong parameters / incorrect data (SW 6A80). */
         public fun wrongParameters(): ApduResponse = ApduResponse(byteArrayOf(), 0x6A.toByte(), 0x80.toByte())
 
-        /** Command not allowed — conditions of use not satisfied (SW 6985). */
+        /** Command not allowed - conditions of use not satisfied (SW 6985). */
         public fun conditionsNotSatisfied(): ApduResponse = ApduResponse(byteArrayOf(), 0x69.toByte(), 0x85.toByte())
 
         /** Instruction not supported (SW 6D00). */

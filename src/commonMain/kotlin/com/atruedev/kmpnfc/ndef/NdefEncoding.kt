@@ -121,6 +121,6 @@ private fun decodeUtf16Be(bytes: ByteArray): String {
         chars[i] = ((bytes[i * 2].toInt() and 0xFF shl 8) or (bytes[i * 2 + 1].toInt() and 0xFF)).toChar()
     }
     val decoded = chars.concatToString()
-    // Strip BOM if present — U+FEFF as literal content is indistinguishable and will be lost.
+    // Strip BOM if present - U+FEFF as literal content is indistinguishable and will be lost.
     return if (decoded.startsWith(UTF16_BOM)) decoded.substring(1) else decoded
 }
