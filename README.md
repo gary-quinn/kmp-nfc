@@ -14,8 +14,8 @@ Part of the wireless trifecta: [kmp-ble](https://github.com/gary-quinn/kmp-ble) 
 
 | Module | Artifact | Description |
 |--------|----------|-------------|
-| **kmp-nfc** | `com.atruedev:kmp-nfc` | Core NFC — tag reading, NDEF read/write, raw transceive (ISO 7816-4 APDU) |
-| **kmp-nfc-testing** | `com.atruedev:kmp-nfc-testing` | Test doubles — `FakeNfcAdapter`, `FakeNfcTag` with error injection and delay simulation |
+| **kmp-nfc** | `com.atruedev:kmp-nfc` | Core NFC - tag reading, NDEF read/write, raw transceive (ISO 7816-4 APDU) |
+| **kmp-nfc-testing** | `com.atruedev:kmp-nfc-testing` | Test doubles - `FakeNfcAdapter`, `FakeNfcTag` with error injection and delay simulation |
 
 ## Setup
 
@@ -169,11 +169,11 @@ NFC has significant platform asymmetry. kmp-nfc exposes this through `NfcCapabil
 
 ## Ecosystem
 
-- [kmp-ble](https://github.com/gary-quinn/kmp-ble) — Bluetooth Low Energy (scanning, GATT, server, DFU)
-- [kmp-uwb](https://github.com/gary-quinn/kmp-uwb) — Ultra-Wideband (precise ranging)
-- **kmp-nfc** — NFC (tap-to-access)
+- [kmp-ble](https://github.com/gary-quinn/kmp-ble) - Bluetooth Low Energy (scanning, GATT, server, DFU)
+- [kmp-uwb](https://github.com/gary-quinn/kmp-uwb) - Ultra-Wideband (precise ranging)
+- **kmp-nfc** - NFC (tap-to-access)
 
-Together these form the foundation for an Aliro SDK — the CSA smart lock standard combining NFC + BLE + UWB.
+Together these form the foundation for an Aliro SDK - the CSA smart lock standard combining NFC + BLE + UWB.
 
 ## Requirements
 
@@ -182,6 +182,18 @@ Together these form the foundation for an Aliro SDK — the CSA smart lock stand
 - iOS 15+
 - kotlinx-coroutines 1.10+
 
+## Contributing
+
+After cloning, enable the repo's pre-commit hooks once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+The hook blocks Unicode typography characters (em/en-dash, smart quotes,
+ellipsis, NBSP) in staged content. See [AGENTS.md](AGENTS.md) for the full list
+and the `typo-ok` bypass.
+
 ## License
 
-[Apache 2.0](LICENSE) — Copyright (C) 2025 Gary Quinn
+[Apache 2.0](LICENSE) - Copyright (C) 2025 Gary Quinn
