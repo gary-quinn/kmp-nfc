@@ -1,5 +1,6 @@
 package com.atruedev.kmpnfc.adapter
 
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,6 +14,7 @@ import android.nfc.tech.NfcA
 import android.nfc.tech.NfcB
 import android.nfc.tech.NfcF
 import android.nfc.tech.NfcV
+import android.os.Build
 import android.os.Bundle
 import com.atruedev.kmpnfc.error.AdapterDisabled
 import com.atruedev.kmpnfc.error.NfcException
@@ -77,15 +79,42 @@ internal class AndroidNfcAdapter(
 
             if (flags == 0) flags = android.nfc.NfcAdapter.FLAG_READER_NFC_A
 
-            adapter.enableReaderMode(
-                activity,
-                { tag: Tag -> trySend(AndroidNfcTag(tag)) },
-                flags,
-                Bundle(),
-            )
+            if (options.enableForegroundDispatch) {
+                NfcBroadcastReceiver.setCallback { tag: Tag ->
+                    trySend(AndroidNfcTag(tag))
+                }
+
+                val techLists = options.pollingTypes.mapNotNull { type ->
+                    type.toPlatformTechnology()?.let { arrayOf(it) }
+                }.toTypedArray()
+
+                adapter.enableForegroundDispatch(
+                    activity,
+                    PendingIntent.getBroadcast(
+                        activity,
+                        0,
+                        Intent(activity, NfcBroadcastReceiver::class.java).also {
+                            it.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                        },
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0),
+                    null,
+                    techLists
+                )
+            } else {
+                adapter.enableReaderMode(
+                    activity,
+                    { tag: Tag -> trySend(AndroidNfcTag(tag)) },
+                    flags,
+                    Bundle(),
+                )
+            }
 
             awaitClose {
-                adapter.disableReaderMode(activity)
+                if (options.enableForegroundDispatch) {
+                    adapter.disableForegroundDispatch(activity)
+                } else {
+                    adapter.disableReaderMode(activity)
+                }
             }
         }
 
@@ -124,6 +153,18 @@ internal class AndroidNfcAdapter(
         )
     }
 }
+
+internal fun TagType.toPlatformTechnology(): String? =
+    when (this) {
+        TagType.NFC_A -> "android.nfc.tech.NfcA"
+        TagType.NFC_B -> "android.nfc.tech.NfcB"
+        TagType.NFC_F -> "android.nfc.tech.NfcF"
+        TagType.NFC_V -> "android.nfc.tech.NfcF"
+        TagType.ISO_DEP -> "android.nfc.tech.IsoDep"
+        TagType.MIFARE_CLASSIC -> "android.nfc.tech.MifareClassic"
+        TagType.MIFARE_ULTRALIGHT -> "android.nfc.tech.MifareUltralight"
+        TagType.UNKNOWN -> null
+    }
 
 internal fun Tag.resolveTagType(): TagType =
     when {
