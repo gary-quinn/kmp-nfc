@@ -88,17 +88,18 @@ internal class AndroidNfcAdapter(
                     type.toPlatformTechnology()?.let { arrayOf(it) }
                 }.toTypedArray()
 
+                val intent = Intent(activity, NfcBroadcastReceiver::class.java)
+                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
                 adapter.enableForegroundDispatch(
                     activity,
                     PendingIntent.getBroadcast(
                         activity,
                         0,
-                        Intent(activity, NfcBroadcastReceiver::class.java).also {
-                            it.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                        },
+                        intent,
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0),
                     null,
-                    techLists
+                    techLists,
                 )
             } else {
                 adapter.enableReaderMode(
