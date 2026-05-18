@@ -12,7 +12,5 @@
                 android:name="com.atruedev.kmpnfc.adapter.KmpNfcInitializer"
                 android:value="androidx.startup" />
         </provider>
-
-        <receiver android:name=".adapter.NfcBroadcastReceiver"/>
     </application>
 </manifest>

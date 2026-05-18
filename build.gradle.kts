@@ -68,6 +68,10 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.core)
             implementation(libs.androidx.startup)
+            implementation(libs.kotlinx.coroutines.android)
+        }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.kotlin.test)
         }
     }
 }

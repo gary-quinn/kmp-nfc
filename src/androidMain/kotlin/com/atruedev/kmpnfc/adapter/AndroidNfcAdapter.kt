@@ -1,5 +1,6 @@
 package com.atruedev.kmpnfc.adapter
 
+import android.app.Activity
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -16,21 +17,27 @@ import android.nfc.tech.NfcF
 import android.nfc.tech.NfcV
 import android.os.Build
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import com.atruedev.kmpnfc.error.AdapterDisabled
 import com.atruedev.kmpnfc.error.NfcException
 import com.atruedev.kmpnfc.error.NoForegroundActivity
 import com.atruedev.kmpnfc.error.NotSupported
 import com.atruedev.kmpnfc.reader.AndroidNfcTag
+import com.atruedev.kmpnfc.reader.AndroidScanMode
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.reader.ReaderOptions
 import com.atruedev.kmpnfc.tag.TagTechnology
 import com.atruedev.kmpnfc.tag.TagType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlin.uuid.Uuid
+import android.nfc.NfcAdapter as PlatformNfcAdapter
 
 internal class AndroidNfcAdapter(
     private val context: Context,
@@ -49,7 +56,7 @@ internal class AndroidNfcAdapter(
                 context: Context,
                 intent: Intent,
             ) {
-                if (intent.action == android.nfc.NfcAdapter.ACTION_ADAPTER_STATE_CHANGED) {
+                if (intent.action == PlatformNfcAdapter.ACTION_ADAPTER_STATE_CHANGED) {
                     _state.value = resolveAdapterState()
                 }
             }
@@ -58,7 +65,7 @@ internal class AndroidNfcAdapter(
     init {
         context.registerReceiver(
             stateReceiver,
-            IntentFilter(android.nfc.NfcAdapter.ACTION_ADAPTER_STATE_CHANGED),
+            IntentFilter(PlatformNfcAdapter.ACTION_ADAPTER_STATE_CHANGED),
         )
     }
 
@@ -66,68 +73,25 @@ internal class AndroidNfcAdapter(
         callbackFlow {
             val adapter = androidAdapter ?: throw NfcException(NotSupported())
             if (!adapter.isEnabled) throw NfcException(AdapterDisabled())
-
             val activity =
                 ActivityTracker.resumedActivity
                     ?: throw NfcException(NoForegroundActivity())
 
-            var flags = 0
-            if (TagType.NFC_A in options.pollingTypes) flags = flags or android.nfc.NfcAdapter.FLAG_READER_NFC_A
-            if (TagType.NFC_B in options.pollingTypes) flags = flags or android.nfc.NfcAdapter.FLAG_READER_NFC_B
-            if (TagType.NFC_F in options.pollingTypes) flags = flags or android.nfc.NfcAdapter.FLAG_READER_NFC_F
-            if (TagType.NFC_V in options.pollingTypes) flags = flags or android.nfc.NfcAdapter.FLAG_READER_NFC_V
-
-            if (flags == 0) flags = android.nfc.NfcAdapter.FLAG_READER_NFC_A
-
-            var unregisterDispatch: () -> Unit = {}
-            if (options.enableForegroundDispatch) {
-                unregisterDispatch =
-                    NfcBroadcastReceiver.setCallback { tag: Tag ->
-                        trySend(AndroidNfcTag(tag))
-                    }
-
-                val techLists =
-                    options.pollingTypes
-                        .mapNotNull { type -> type.toPlatformTechnology()?.let { arrayOf(it) } }
-                        .toTypedArray()
-
-                val intent = Intent(activity, NfcBroadcastReceiver::class.java)
-                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-
-                val pendingFlags =
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        PendingIntent.FLAG_MUTABLE
-                    } else {
-                        0
-                    }
-
-                adapter.enableForegroundDispatch(
-                    activity,
-                    PendingIntent.getBroadcast(activity, 0, intent, pendingFlags),
-                    null,
-                    techLists,
-                )
-            } else {
-                adapter.enableReaderMode(
-                    activity,
-                    { tag: Tag -> trySend(AndroidNfcTag(tag)) },
-                    flags,
-                    Bundle(),
-                )
-            }
-
-            awaitClose {
-                if (options.enableForegroundDispatch) {
-                    adapter.disableForegroundDispatch(activity)
-                    unregisterDispatch()
-                } else {
-                    adapter.disableReaderMode(activity)
+            val pollingTypes = options.pollingTypes.ifEmpty { setOf(TagType.NFC_A) }
+            val emit: (Tag) -> Unit = { trySend(AndroidNfcTag(it)) }
+            val dispose =
+                when (options.androidScanMode) {
+                    AndroidScanMode.ReaderMode ->
+                        startReaderMode(adapter, activity, pollingTypes, emit)
+                    AndroidScanMode.ForegroundDispatch ->
+                        startForegroundDispatch(adapter, activity, pollingTypes, emit)
                 }
-            }
-        }
+
+            awaitClose(dispose)
+        }.flowOn(Dispatchers.Main.immediate)
 
     override fun close() {
-        context.unregisterReceiver(stateReceiver)
+        runCatching { context.unregisterReceiver(stateReceiver) }
     }
 
     private fun resolveAdapterState(): NfcAdapterState =
@@ -144,9 +108,9 @@ internal class AndroidNfcAdapter(
             canReadNdef = true,
             canWriteNdef = true,
             canReadRawTag = true,
-            // Android CAN dispatch NFC intents in the background via intent filters, but this
-            // library uses reader mode which requires a foreground Activity. Background dispatch
-            // is an app-manifest concern, not a library capability.
+            // Manifest intent filters can dispatch NFC in the background, but this library
+            // owns a foreground reader session - that is an app-manifest concern, not a
+            // library capability.
             canBackgroundRead = false,
             supportedTagTypes =
                 setOf(
@@ -162,17 +126,51 @@ internal class AndroidNfcAdapter(
     }
 }
 
-internal fun TagType.toPlatformTechnology(): String? =
-    when (this) {
-        TagType.NFC_A -> "android.nfc.tech.NfcA"
-        TagType.NFC_B -> "android.nfc.tech.NfcB"
-        TagType.NFC_F -> "android.nfc.tech.NfcF"
-        TagType.NFC_V -> "android.nfc.tech.NfcV"
-        TagType.ISO_DEP -> "android.nfc.tech.IsoDep"
-        TagType.MIFARE_CLASSIC -> "android.nfc.tech.MifareClassic"
-        TagType.MIFARE_ULTRALIGHT -> "android.nfc.tech.MifareUltralight"
-        TagType.UNKNOWN -> null
+private fun startReaderMode(
+    adapter: PlatformNfcAdapter,
+    activity: Activity,
+    pollingTypes: Set<TagType>,
+    emit: (Tag) -> Unit,
+): () -> Unit {
+    adapter.enableReaderMode(activity, emit, pollingTypes.toReaderFlags(), Bundle())
+    return { runCatching { adapter.disableReaderMode(activity) } }
+}
+
+private fun startForegroundDispatch(
+    adapter: PlatformNfcAdapter,
+    activity: Activity,
+    pollingTypes: Set<TagType>,
+    emit: (Tag) -> Unit,
+): () -> Unit {
+    val action = "${activity.packageName}.kmpnfc.TAG_DISCOVERED.${Uuid.random()}"
+    val receiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(
+                context: Context?,
+                intent: Intent?,
+            ) {
+                intent?.extractNfcTag()?.let(emit)
+            }
+        }
+    ContextCompat.registerReceiver(
+        activity,
+        receiver,
+        IntentFilter(action),
+        ContextCompat.RECEIVER_NOT_EXPORTED,
+    )
+
+    val intent = Intent(action).setPackage(activity.packageName)
+    val pendingFlags =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0
+    val pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, pendingFlags)
+
+    adapter.enableForegroundDispatch(activity, pendingIntent, null, pollingTypes.toTechLists())
+
+    return {
+        runCatching { adapter.disableForegroundDispatch(activity) }
+        runCatching { activity.unregisterReceiver(receiver) }
     }
+}
 
 internal fun Tag.resolveTagType(): TagType =
     when {
