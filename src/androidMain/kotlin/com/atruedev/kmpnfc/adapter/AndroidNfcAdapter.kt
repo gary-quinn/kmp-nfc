@@ -79,25 +79,31 @@ internal class AndroidNfcAdapter(
 
             if (flags == 0) flags = android.nfc.NfcAdapter.FLAG_READER_NFC_A
 
+            var unregisterDispatch: () -> Unit = {}
             if (options.enableForegroundDispatch) {
-                NfcBroadcastReceiver.setCallback { tag: Tag ->
-                    trySend(AndroidNfcTag(tag))
-                }
+                unregisterDispatch =
+                    NfcBroadcastReceiver.setCallback { tag: Tag ->
+                        trySend(AndroidNfcTag(tag))
+                    }
 
-                val techLists = options.pollingTypes.mapNotNull { type ->
-                    type.toPlatformTechnology()?.let { arrayOf(it) }
-                }.toTypedArray()
+                val techLists =
+                    options.pollingTypes
+                        .mapNotNull { type -> type.toPlatformTechnology()?.let { arrayOf(it) } }
+                        .toTypedArray()
 
                 val intent = Intent(activity, NfcBroadcastReceiver::class.java)
                 intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
+                val pendingFlags =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        PendingIntent.FLAG_MUTABLE
+                    } else {
+                        0
+                    }
+
                 adapter.enableForegroundDispatch(
                     activity,
-                    PendingIntent.getBroadcast(
-                        activity,
-                        0,
-                        intent,
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) PendingIntent.FLAG_MUTABLE else 0),
+                    PendingIntent.getBroadcast(activity, 0, intent, pendingFlags),
                     null,
                     techLists,
                 )
@@ -113,6 +119,7 @@ internal class AndroidNfcAdapter(
             awaitClose {
                 if (options.enableForegroundDispatch) {
                     adapter.disableForegroundDispatch(activity)
+                    unregisterDispatch()
                 } else {
                     adapter.disableReaderMode(activity)
                 }

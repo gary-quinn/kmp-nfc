@@ -6,28 +6,36 @@ import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
 import android.os.Build
+import java.util.concurrent.atomic.AtomicReference
 
-public class NfcBroadcastReceiver: BroadcastReceiver() {
-    override fun onReceive(context: Context?, intent: Intent?) {
+public class NfcBroadcastReceiver : BroadcastReceiver() {
+    override fun onReceive(
+        context: Context?,
+        intent: Intent?,
+    ) {
         if (intent == null) return
 
-        val tag: Tag? =
+        val tag: Tag =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
             } else {
+                @Suppress("DEPRECATION")
                 intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-            }
+            } ?: return
 
-        if (tag == null) return
-
-        handleTag(tag)
+        currentHandler.get()?.invoke(tag)
     }
 
     public companion object {
-        private var handleTag: (Tag) -> Unit = { println("no callback set") }
+        private val currentHandler = AtomicReference<((Tag) -> Unit)?>(null)
 
-        public fun setCallback(cb: (Tag) -> Unit) {
-            handleTag = cb
+        /**
+         * Registers [cb] as the current tag handler. Returns a disposer that
+         * clears the handler only if it has not been replaced by another caller.
+         */
+        public fun setCallback(cb: (Tag) -> Unit): () -> Unit {
+            currentHandler.set(cb)
+            return { currentHandler.compareAndSet(cb, null) }
         }
     }
 }
