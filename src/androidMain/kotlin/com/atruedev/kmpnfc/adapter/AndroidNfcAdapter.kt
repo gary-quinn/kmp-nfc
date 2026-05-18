@@ -160,7 +160,7 @@ internal fun TagType.toPlatformTechnology(): String? =
         TagType.NFC_A -> "android.nfc.tech.NfcA"
         TagType.NFC_B -> "android.nfc.tech.NfcB"
         TagType.NFC_F -> "android.nfc.tech.NfcF"
-        TagType.NFC_V -> "android.nfc.tech.NfcF"
+        TagType.NFC_V -> "android.nfc.tech.NfcV"
         TagType.ISO_DEP -> "android.nfc.tech.IsoDep"
         TagType.MIFARE_CLASSIC -> "android.nfc.tech.MifareClassic"
         TagType.MIFARE_ULTRALIGHT -> "android.nfc.tech.MifareUltralight"
