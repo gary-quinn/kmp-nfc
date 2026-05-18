@@ -15,6 +15,22 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
+## [0.0.4] - 2026-05-18
+
+### Added
+- feat: Add support for using Android's foreground dispatch
+
+### Changed
+- build(dependabot): bump com.android.kotlin.multiplatform.library from 9.1.0 to 9.1.1
+- chore: add agent guidelines and typography pre-commit hook
+- ci: add typography-check job
+- build(dependabot): bump kotlin from 2.3.20 to 2.3.21
+- build(dependabot): bump coroutines from 1.10.2 to 1.11.0
+- ci: exclude binaries from typography check
+
+
+---
+
 ## [0.0.3] - 2026-04-16
 
 ### Changed
@@ -48,6 +64,7 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
-[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.3...HEAD
+[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.4...HEAD
+[0.0.4]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.1...v0.0.2
