@@ -154,6 +154,20 @@ val failingTag = fakeNfcTag {
 }
 ```
 
+### Android scan modes
+
+Android exposes two scanning APIs via `ReaderOptions.androidScanMode`:
+
+```kotlin
+val options = ReaderOptions(androidScanMode = AndroidScanMode.ForegroundDispatch)
+```
+
+- `ReaderMode` (default) - `NfcAdapter.enableReaderMode`. The system suppresses
+  default NDEF intent resolution, so URI tags do not launch the browser.
+- `ForegroundDispatch` - `NfcAdapter.enableForegroundDispatch`. The library owns
+  a per-session broadcast receiver; the app takes priority over other apps'
+  intent filters while in the foreground.
+
 ## Platform Differences
 
 NFC has significant platform asymmetry. kmp-nfc exposes this through `NfcCapabilities` rather than hiding it behind a lowest-common-denominator API.
@@ -163,7 +177,7 @@ NFC has significant platform asymmetry. kmp-nfc exposes this through `NfcCapabil
 | NDEF Read | Yes | Yes |
 | NDEF Write | Yes | Yes (iOS 13+) |
 | Raw Transceive | Yes (all tag types) | Yes (ISO 7816, MiFare) |
-| Background Read | No (reader mode requires foreground) | Yes (URL tags only, system-managed) |
+| Background Read | No (both scan modes require foreground) | Yes (URL tags only, system-managed) |
 | Tag Types | NFC-A/B/F/V, ISO-DEP, MIFARE | NFC-A/B/F/V, ISO-DEP |
 | Session UX | Transparent | System NFC sheet |
 
