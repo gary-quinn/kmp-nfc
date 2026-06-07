@@ -6,7 +6,7 @@ agp = "9.2.1"
 coroutines = "1.11.0"
 androidMinSdk = "21"
 androidCompileSdk = "36"
-androidx-core = "1.18.0"
+androidx-core = "1.19.0"
 turbine = "1.2.1"
 
 [libraries]
