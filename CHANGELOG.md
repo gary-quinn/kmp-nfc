@@ -15,6 +15,29 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
+## [0.0.5] - 2026-07-19
+
+### Changed
+- build(dependabot): bump kotlin from 2.3.20 to 2.3.21
+- build(dependabot): bump com.android.kotlin.multiplatform.library from 9.1.1 to 9.2.1
+- build(dependabot): bump coroutines from 1.10.2 to 1.11.0
+- build(dependabot): bump gradle-wrapper from 9.4.1 to 9.5.1
+- ci: exclude binaries from typography check
+- build(dependabot): bump androidx.core:core-ktx from 1.18.0 to 1.19.0
+- ci(dependabot): bump gradle/actions from 6.0.1 to 6.2.0
+- ci(dependabot): bump actions/checkout from 6.0.2 to 7.0.0
+- ci(dependabot): bump gradle/actions/setup-gradle from 6.0.1 to 6.2.0
+- build(dependabot): bump gradle-wrapper from 9.5.1 to 9.6.1
+- build(dependabot): bump com.vanniktech.maven.publish from 0.36.0 to 0.37.0
+- ci(dependabot): bump actions/setup-java from 5.2.0 to 5.6.0
+- build(dependabot): bump kotlin from 2.3.21 to 2.4.10
+
+### Fixed
+- fix: bump compileSdk to 37; ci: remove broken auto-merge step
+
+
+---
+
 ## [0.0.4] - 2026-05-18
 
 ### Added
@@ -64,7 +87,8 @@ _Changes on `main` that have not yet been tagged for release._
 
 ---
 
-[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.1...v0.0.2
