@@ -112,6 +112,7 @@ internal class AndroidNfcAdapter(
             // owns a foreground reader session - that is an app-manifest concern, not a
             // library capability.
             canBackgroundRead = false,
+            canHostCardEmulation = true,
             supportedTagTypes =
                 setOf(
                     TagType.NFC_A,

@@ -72,6 +72,7 @@ public class FakeNfcAdapter(
                 canWriteNdef = true,
                 canReadRawTag = true,
                 canBackgroundRead = false,
+                canHostCardEmulation = true,
                 supportedTagTypes =
                     setOf(
                         TagType.NFC_A,
