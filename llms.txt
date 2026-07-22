@@ -6,7 +6,7 @@
 
 kmp-nfc is a Kotlin Multiplatform NFC library. It provides a coroutine-based API for NFC tag communication across Android (API 33+) and iOS (15+) from shared Kotlin code.
 
-Part of the wireless trifecta: kmp-ble (BLE) + kmp-uwb (UWB) + kmp-nfc (NFC), forming the foundation for an Aliro smart lock SDK.
+Part of the wireless trifecta: kmp-ble (BLE) + kmp-uwb (UWB) + kmp-nfc (NFC), forming a complete wireless stack for NFC, BLE, and UWB applications.
 
 ## Installation
 

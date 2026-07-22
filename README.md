@@ -120,7 +120,7 @@ tag.writeNdef(message)
 
 ### Raw APDU transceive
 
-For ISO 7816-4 smart cards (Aliro, passports, payment cards):
+For ISO 7816-4 smart cards (passports, payment cards):
 
 ```kotlin
 // SELECT command
@@ -187,7 +187,7 @@ NFC has significant platform asymmetry. kmp-nfc exposes this through `NfcCapabil
 - [kmp-uwb](https://github.com/gary-quinn/kmp-uwb) - Ultra-Wideband (precise ranging)
 - **kmp-nfc** - NFC (tap-to-access)
 
-Together these form the foundation for an Aliro SDK - the CSA smart lock standard combining NFC + BLE + UWB.
+Together these form a complete wireless stack for NFC + BLE + UWB applications.
 
 ## Requirements
 

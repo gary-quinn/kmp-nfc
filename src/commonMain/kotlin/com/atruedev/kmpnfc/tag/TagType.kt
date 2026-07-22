@@ -20,7 +20,7 @@ public enum class TagType {
     /** ISO 15693 - vicinity cards with longer read range. */
     NFC_V,
 
-    /** ISO 14443-4 - smart cards, passports, contactless payment. Required for Aliro. */
+    /** ISO 14443-4 - smart cards, passports, contactless payment. */
     ISO_DEP,
 
     /** NXP MIFARE Classic - Android only, proprietary. */
