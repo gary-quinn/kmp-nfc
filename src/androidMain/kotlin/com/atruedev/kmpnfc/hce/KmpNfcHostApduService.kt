@@ -2,8 +2,6 @@ package com.atruedev.kmpnfc.hce
 
 import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
-import com.atruedev.kmpnfc.tag.ApduCommand
-import com.atruedev.kmpnfc.tag.ApduResponse
 
 /**
  * Android [HostApduService] subclass registered in the library manifest.
@@ -16,13 +14,16 @@ import com.atruedev.kmpnfc.tag.ApduResponse
  * manifest auto-merges the service declaration into the host app.
  */
 public class KmpNfcHostApduService : HostApduService() {
+    private lateinit var hostBridge: HostApduBridge
+
     override fun onCreate() {
         super.onCreate()
-        HceServiceRegistry.setHostService(this)
+        hostBridge = HostApduBridge { responseApdu -> sendResponseApdu(responseApdu) }
+        HceServiceRegistry.bindHost(hostBridge)
     }
 
     override fun onDestroy() {
-        HceServiceRegistry.clearHostService(this)
+        HceServiceRegistry.unbindHost(hostBridge)
         super.onDestroy()
     }
 
@@ -31,22 +32,13 @@ public class KmpNfcHostApduService : HostApduService() {
      * is received from the external reader.
      *
      * Returns `null` for valid commands (response sent asynchronously via
-     * [sendResponseApdu]). Returns an error APDU synchronously when parsing fails.
+     * [sendResponseApdu]). Returns `6F00` synchronously when there is no active
+     * session or the bytes are malformed.
      */
     override fun processCommandApdu(
         commandApdu: ByteArray,
         extras: Bundle?,
-    ): ByteArray? {
-        val service = HceServiceRegistry.get() ?: return null
-        val command =
-            try {
-                ApduCommand.fromBytes(commandApdu)
-            } catch (_: IllegalArgumentException) {
-                return ApduResponse.generalError().toBytes()
-            }
-        service.dispatch(command)
-        return null
-    }
+    ): ByteArray? = processInboundApdu(commandApdu, HceServiceRegistry.get())
 
     /**
      * Called by the NFC controller when the reader disconnects or

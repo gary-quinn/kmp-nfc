@@ -46,24 +46,24 @@ hce.stop() // [start] returns normally, no DeactivationException
 3. Calls `sendResponseApdu()` from that serial dispatcher when the processor
    completes.
 
-Invalid APDU bytes get a synchronous `6F00` response from `processCommandApdu()`.
+Invalid APDU bytes or commands received before [HceService.start] suspend get a
+synchronous `6F00` response from `processCommandApdu()`.
 
 ## Registry
 
 `HceServiceRegistry` links the system-created `KmpNfcHostApduService` to the
-consumer's `AndroidHceService` singleton. `hostService` lifetime follows the
-bound `HostApduService`; `hceService` is cleared on session cleanup only.
+consumer's `AndroidHceService` singleton. `hostBridge` is bound for the
+`HostApduService` lifetime; `session` is cleared on session cleanup only.
 
 ## Capabilities
 
 | Field | Android meaning |
 |-------|-----------------|
 | `isSupported` | `FEATURE_NFC_HOST_CARD_EMULATION` + `CardEmulation` available |
-| `canPaymentCategory` | This app is the default Tap & Pay wallet |
+| `canPaymentCategory` | This app is the default Tap & Pay wallet (live read) |
 
-`NfcCapabilities.canHostCardEmulation` uses the same feature flag. Query
-`hce.capabilities.canPaymentCategory` before registering `AidCategory.PAYMENT`
-AIDs - `start()` throws `NfcException(Unauthorized)` otherwise.
+`NfcCapabilities.canHostCardEmulation` uses the same feature flag (snapshot at
+`NfcAdapter` construction). `hce.capabilities` is recomputed on each read.
 
 ## Errors
 
@@ -83,13 +83,13 @@ group. AIDs are registered at runtime via `CardEmulation.registerAidsForService(
 
 ## Testing
 
-- `FakeHceService` in `kmp-nfc-testing` - serial command processing, same
-  deactivation/stop semantics as Android.
-- `HceServiceTest` - common tests against the fake.
-- `HceServiceRegistryTest` - Android host test for registry wiring.
+- `HceServiceTest` - session lifecycle against `FakeHceService`
+- `HceConfigTest` - AID validation
+- `HceServiceRegistryTest` - registry and host-bridge lifetime
+- `HceInboundApduTest` - malformed/no-session APDU returns `6F00`
 
-No Robolectric coverage for `HostApduService` in v1; integration testing
-requires a device or emulator.
+Integration testing for the full `HostApduService` stack requires a device or
+emulator.
 
 ## Platform status
 

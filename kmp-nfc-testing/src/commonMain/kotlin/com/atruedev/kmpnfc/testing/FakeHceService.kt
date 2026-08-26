@@ -64,7 +64,6 @@ public class FakeHceService(
         try {
             suspendCancellableCoroutine<Unit> { cont ->
                 continuation = cont
-                cont.invokeOnCancellation { cleanup() }
             }
         } catch (e: CancellationException) {
             throw unwrapStartCancellation(e)
@@ -96,8 +95,9 @@ public class FakeHceService(
                 } catch (e: CancellationException) {
                     cont.cancel(e)
                 } catch (e: Throwable) {
-                    continuation?.resumeWith(Result.failure(e))
-                    cont.cancel(CancellationException("Processor failed", e))
+                    val wrapped = CancellationException("Processor failed", e)
+                    continuation?.cancel(wrapped)
+                    cont.cancel(wrapped)
                 }
             }
         }
@@ -105,15 +105,21 @@ public class FakeHceService(
 
     /** Simulate reader deactivation (LINK_LOSS or DESELECTED). */
     public fun simulateDeactivation(reason: DeactivationReason) {
-        continuation?.resumeWith(Result.failure(DeactivationException(reason)))
+        continuation?.cancel(
+            CancellationException("Deactivated: $reason", DeactivationException(reason)),
+        )
     }
 
     private fun unwrapStartCancellation(e: CancellationException): Throwable {
-        val cause = e.cause ?: return e
-        return when (cause) {
-            is DeactivationException -> cause
-            else -> cause
+        var current: Throwable? = e.cause
+        while (current != null) {
+            when (current) {
+                is DeactivationException -> return current
+                is CancellationException -> current = current.cause
+                else -> return current
+            }
         }
+        return e
     }
 
     private fun cleanup() {

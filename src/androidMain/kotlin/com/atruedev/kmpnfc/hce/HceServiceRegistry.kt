@@ -1,20 +1,18 @@
 package com.atruedev.kmpnfc.hce
 
-import android.nfc.cardemulation.HostApduService
-
 /**
- * Process-scoped registry bridging Android's [HostApduService] (created by the
- * system) and the library's [AndroidHceService] (created by the consumer).
+ * Process-scoped registry bridging the system [HostApduService] and the
+ * consumer's [AndroidHceService].
  *
  * [session] is written once per active HCE session from [AndroidHceService.start].
- * [hostService] is owned by the system [HostApduService] lifecycle.
+ * [hostBridge] is bound for the [KmpNfcHostApduService] lifetime.
  */
 internal object HceServiceRegistry {
     @Volatile
     private var session: HceSession? = null
 
     @Volatile
-    private var hostService: HostApduService? = null
+    private var hostBridge: HostApduBridge? = null
 
     fun register(service: HceSession) {
         check(session == null) { "HCE service already active" }
@@ -29,13 +27,13 @@ internal object HceServiceRegistry {
 
     fun get(): HceSession? = session
 
-    fun setHostService(service: HostApduService) {
-        hostService = service
+    fun bindHost(bridge: HostApduBridge) {
+        hostBridge = bridge
     }
 
-    fun clearHostService(service: HostApduService) {
-        if (hostService === service) hostService = null
+    fun unbindHost(bridge: HostApduBridge) {
+        if (hostBridge === bridge) hostBridge = null
     }
 
-    fun getHostService(): HostApduService? = hostService
+    fun getHostBridge(): HostApduBridge? = hostBridge
 }

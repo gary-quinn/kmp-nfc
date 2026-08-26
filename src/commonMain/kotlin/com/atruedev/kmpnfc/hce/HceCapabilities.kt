@@ -5,6 +5,9 @@ package com.atruedev.kmpnfc.hce
  *
  * Query before calling [HceService.start] to avoid runtime surprises.
  *
+ * On Android, [HceService.capabilities] is recomputed on each read so
+ * [canPaymentCategory] reflects the current default Tap & Pay wallet state.
+ *
  * | Field | Meaning |
  * |-------|---------|
  * | [isSupported] | Device has HCE hardware and this app can register AIDs |

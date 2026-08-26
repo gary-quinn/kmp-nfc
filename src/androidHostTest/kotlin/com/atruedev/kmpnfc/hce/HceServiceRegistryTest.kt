@@ -30,11 +30,19 @@ class HceServiceRegistryTest {
     }
 
     @Test
-    fun unregister_leaves_host_service_alone() {
+    fun unregister_does_not_unbind_host_bridge() {
+        val bridge = HostApduBridge { }
         val session = FakeSession()
+        HceServiceRegistry.bindHost(bridge)
         HceServiceRegistry.register(session)
+
         HceServiceRegistry.unregister(session)
+
         assertNull(HceServiceRegistry.get())
+        assertSame(bridge, HceServiceRegistry.getHostBridge())
+
+        HceServiceRegistry.unbindHost(bridge)
+        assertNull(HceServiceRegistry.getHostBridge())
     }
 
     private class FakeSession : HceSession {

@@ -51,7 +51,8 @@ internal class AndroidHceService private constructor(
     @Volatile
     private var session: Session? = null
 
-    override val capabilities: HceCapabilities = resolveCapabilities()
+    override val capabilities: HceCapabilities
+        get() = resolveCapabilities()
 
     override suspend fun start(
         config: HceConfig,
@@ -145,7 +146,7 @@ internal class AndroidHceService private constructor(
                 if (!s.scope.isActive) return@launch
                 val response = proc(command)
                 if (!s.scope.isActive) return@launch
-                HceServiceRegistry.getHostService()?.sendResponseApdu(response.toBytes())
+                HceServiceRegistry.getHostBridge()?.sendResponseApdu(response.toBytes())
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
@@ -176,11 +177,15 @@ internal class AndroidHceService private constructor(
     }
 
     private fun unwrapStartCancellation(e: CancellationException): Throwable {
-        val cause = e.cause ?: return e
-        return when (cause) {
-            is DeactivationException -> cause
-            else -> cause
+        var current: Throwable? = e.cause
+        while (current != null) {
+            when (current) {
+                is DeactivationException -> return current
+                is CancellationException -> current = current.cause
+                else -> return current
+            }
         }
+        return e
     }
 
     // --- Session ---

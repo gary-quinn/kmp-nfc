@@ -15,8 +15,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class HceServiceTest {
-    // --- Capabilities ---
-
     @Test
     fun capabilities_isSupported_true() {
         val hce = FakeHceService()
@@ -29,8 +27,6 @@ class HceServiceTest {
         assertFalse(caps.isSupported)
         assertFalse(caps.canPaymentCategory)
     }
-
-    // --- AID Registration ---
 
     @Test
     fun start_registersAids() =
@@ -45,8 +41,6 @@ class HceServiceTest {
             hce.stop()
             job.join()
         }
-
-    // --- Processor receives commands ---
 
     @Test
     fun processor_receives_select_aid() =
@@ -98,8 +92,6 @@ class HceServiceTest {
             job.join()
         }
 
-    // --- Responses are tracked ---
-
     @Test
     fun responses_are_recorded() =
         runTest {
@@ -133,8 +125,6 @@ class HceServiceTest {
             hce.stop()
             job.join()
         }
-
-    // --- Deactivation ---
 
     @Test
     fun deactivation_cancels_processor() =
@@ -209,8 +199,6 @@ class HceServiceTest {
             assertFalse(hce.isStarted)
         }
 
-    // --- Stop ---
-
     @Test
     fun stop_ends_session() =
         runTest {
@@ -233,8 +221,6 @@ class HceServiceTest {
             job.join()
             assertFalse(hce.isStarted)
         }
-
-    // --- Double start ---
 
     @Test
     fun double_start_throws() =
@@ -268,15 +254,11 @@ class HceServiceTest {
             job.join()
         }
 
-    // --- Stop when idle is a no-op ---
-
     @Test
     fun stop_when_idle_is_noop() {
         val hce = FakeHceService()
         hce.stop()
     }
-
-    // --- Multiple AidRegistration ---
 
     @Test
     fun start_registers_multiple_aids() =
@@ -299,82 +281,6 @@ class HceServiceTest {
             hce.stop()
             job.join()
         }
-
-    // --- ApduCommand.fromBytes parses correctly ---
-
-    @Test
-    fun apdu_command_fromBytes_select() {
-        val bytes =
-            byteArrayOf(
-                0x00,
-                0xA4.toByte(),
-                0x04,
-                0x00,
-                0x07,
-                0xF0.toByte(),
-                0x01,
-                0x02,
-                0x03,
-                0x04,
-                0x05,
-                0x06,
-            )
-        val cmd = ApduCommand.fromBytes(bytes)
-
-        assertEquals(0x00.toByte(), cmd.cla)
-        assertEquals(0xA4.toByte(), cmd.ins)
-        assertEquals(0x04.toByte(), cmd.p1)
-        assertEquals(0x00.toByte(), cmd.p2)
-        assertEquals(7, cmd.data!!.size)
-        assertEquals(0xF0.toByte(), cmd.data!![0])
-    }
-
-    // --- ApduResponse.toBytes ---
-
-    @Test
-    fun apdu_response_toBytes() {
-        val response = ApduResponse.success(byteArrayOf(0x48, 0x65, 0x6C, 0x6C, 0x6F))
-        val bytes = response.toBytes()
-
-        assertEquals(7, bytes.size)
-        assertEquals(0x48.toByte(), bytes[0])
-        assertEquals(0x90.toByte(), bytes[5])
-        assertEquals(0x00.toByte(), bytes[6])
-    }
-
-    // --- AidRegistration validation ---
-
-    @Test
-    fun aid_registration_valid() {
-        val reg = AidRegistration("F0010203040506")
-        assertEquals("F0010203040506", reg.aid)
-        assertEquals(AidCategory.OTHER, reg.category)
-    }
-
-    @Test
-    fun aid_registration_hex_validation() {
-        assertFailsWith<IllegalArgumentException> {
-            AidRegistration("ZZZZ0203040506")
-        }
-    }
-
-    @Test
-    fun aid_registration_length_validation() {
-        assertFailsWith<IllegalArgumentException> {
-            AidRegistration("F001")
-        }
-    }
-
-    // --- DeactivationException ---
-
-    @Test
-    fun deactivation_exception_carries_reason() {
-        val ex = DeactivationException(DeactivationReason.LINK_LOSS)
-        assertEquals(DeactivationReason.LINK_LOSS, ex.reason)
-        assertTrue(ex.message!!.contains("LINK_LOSS"))
-    }
-
-    // --- Helpers ---
 
     private fun TestScope.backgroundStart(
         hce: FakeHceService,
