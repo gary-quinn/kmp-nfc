@@ -35,7 +35,7 @@ public interface HceService {
      * Start card emulation. Suspends until [stop] is called or the external
      * reader disconnects.
      *
-     * The [processor] runs on a background dispatcher -- callers can perform
+     * The [processor] runs on a background dispatcher - callers can perform
      * I/O, cryptography, or database lookups without blocking the NFC stack.
      *
      * Only one HCE session can be active at a time.

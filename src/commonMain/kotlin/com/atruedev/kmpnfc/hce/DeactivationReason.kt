@@ -7,7 +7,7 @@ package com.atruedev.kmpnfc.hce
  * reader disconnects or the consumer calls [HceService.stop].
  */
 public enum class DeactivationReason {
-    /** RF field lost -- the reader moved out of range. */
+    /** RF field lost - the reader moved out of range. */
     LINK_LOSS,
 
     /** The reader sent a DESELECT command for the current AID. */

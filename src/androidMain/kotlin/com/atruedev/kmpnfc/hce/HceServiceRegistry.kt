@@ -6,7 +6,7 @@ import android.nfc.cardemulation.HostApduService
  * Process-scoped registry bridging Android's [HostApduService] (created by the
  * system) and the library's [AndroidHceService] (created by the consumer).
  *
- * Single-writer, sequential-reader pattern -- no locks needed:
+ * Single-writer, sequential-reader pattern - no locks needed:
  * - [register] is called once from [AndroidHceService.start]
  * - [unregister] is called once from [AndroidHceService.cleanup]
  * - [get] is called from [KmpNfcHostApduService] on the UI thread, sequentially

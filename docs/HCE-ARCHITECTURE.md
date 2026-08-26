@@ -1,13 +1,13 @@
 # HCE Architecture
 
-Host Card Emulation for `kmp-nfc` -- design rationale, threading model, platform
+Host Card Emulation for `kmp-nfc` - design rationale, threading model, platform
 wire-up, and testing strategy.
 
 ## Overview
 
 HCE lets a phone act as a contactless smart card. An external NFC reader sends ISO
 7816-4 APDU commands to the device, and the app responds. This is the inverse of the
-existing `NfcAdapter.tags()` reader mode -- the device is the *target*, not the
+existing `NfcAdapter.tags()` reader mode - the device is the *target*, not the
 *initiator*.
 
 ```mermaid
@@ -18,9 +18,9 @@ graph LR
 
 ## Why a Separate Entry Point
 
-`NfcAdapter` is the reader/writer entry point -- it *initiates* communication
+`NfcAdapter` is the reader/writer entry point - it *initiates* communication
 (`tags()` cold Flow: collect starts session, cancel ends it). HCE is the
-*passive* role -- the system calls you when a reader sends a command. These are
+*passive* role - the system calls you when a reader sends a command. These are
 fundamentally different lifecycles and threading models. Forcing HCE into
 `NfcAdapter` would muddy the API and create confusing "start reader or start
 emulation?" initialization paths.
@@ -77,7 +77,7 @@ public interface HceService {
      * Start card emulation. Suspends until [stop] is called or the external
      * reader disconnects.
      *
-     * [processor] runs on a background dispatcher -- the consumer can perform
+     * [processor] runs on a background dispatcher - the consumer can perform
      * I/O, crypto, or database lookups without blocking the NFC stack.
      *
      * @throws DeactivationException if the reader disconnects.
@@ -101,8 +101,8 @@ Three designs were evaluated:
 
 | Design | Consumer API | Android Threading | Verdict |
 |--------|-------------|-------------------|---------|
-| **A) Callback** | `fun start(listener: HceListener)` -- `listener.processCommand()` returns `ApduResponse` synchronously | Force consumer to run on UI thread | Rejected -- blocks UI thread |
-| **B) Flow + respond()** | Consumer collects `Flow<ApduCommand>` and calls `respond(ApduResponse)` | `processCommandApdu()` must block until `respond()` is called -- UI thread stall | Rejected -- UI thread stall is a platform violation |
+| **A) Callback** | `fun start(listener: HceListener)` - `listener.processCommand()` returns `ApduResponse` synchronously | Force consumer to run on UI thread | Rejected - blocks UI thread |
+| **B) Flow + respond()** | Consumer collects `Flow<ApduCommand>` and calls `respond(ApduResponse)` | `processCommandApdu()` must block until `respond()` is called - UI thread stall | Rejected - UI thread stall is a platform violation |
 | **C) Suspend processor** | `suspend fun start { command -> response }` | `processCommandApdu()` launches coroutine on `Dispatchers.IO`, calls `sendResponseApdu()` when done, returns `null` immediately | **Chosen** |
 
 Android's `HostApduService.processCommandApdu()` runs on the **UI thread**.
@@ -113,17 +113,17 @@ the documented async pattern. Design C maps directly to this.
 
 Two categories of error:
 
-**Configuration errors** (thrown before `start()` suspends -- use existing `NfcException`):
+**Configuration errors** (thrown before `start()` suspends - use existing `NfcException`):
 
 ```
 NfcError (sealed interface)
   AdapterError
-    NotSupported        -- no NFC hardware
-    AdapterDisabled     -- NFC is off
-    Unauthorized        -- permission denied
+    NotSupported        - no NFC hardware
+    AdapterDisabled     - NFC is off
+    Unauthorized        - permission denied
   HceError (new sealed interface)
-    AidConflict         -- another app registered the same AID
-    PaymentNotDefault   -- payment AIDs but app not default wallet
+    AidConflict         - another app registered the same AID
+    PaymentNotDefault   - payment AIDs but app not default wallet
 ```
 
 **Runtime deactivation** (thrown AFTER `start()` is suspended):
@@ -220,7 +220,7 @@ sequenceDiagram
 
 Key points:
 
-1. `processCommandApdu()` **always returns `null`** -- the library never blocks
+1. `processCommandApdu()` **always returns `null`** - the library never blocks
    the UI thread, even if the processor is fast enough to respond synchronously.
    Consistency over micro-optimization.
 
@@ -279,7 +279,7 @@ sequenceDiagram
 When deactivation arrives while a processor is still running:
 
 1. The processor coroutine is cancelled (`job.cancel()`).
-2. The response (if any) is discarded -- `sendResponseApdu()` is NOT called
+2. The response (if any) is discarded - `sendResponseApdu()` is NOT called
    because the NFC controller has already torn down the RF link.
 3. `start()` resumes with `DeactivationException(LINK_LOSS)`.
 
@@ -332,7 +332,7 @@ internal object HceServiceRegistry {
 - `processCommandApdu()` is called sequentially by the system
 - `get()` returns a stable reference for the session lifetime
 
-No locks, no atomics, no `synchronized` -- consistent with the project's
+No locks, no atomics, no `synchronized` - consistent with the project's
 `limitedParallelism(1)` policy over mutexes.
 
 ## Android Manifest
@@ -342,7 +342,7 @@ The library manifest auto-merges into the consumer's app:
 ```xml
 <uses-permission android:name="android.permission.NFC" />
 
-<!-- HCE is optional -- reader mode works without it -->
+<!-- HCE is optional - reader mode works without it -->
 <uses-feature
     android:name="android.hardware.nfc.hce"
     android:required="false" />
@@ -388,7 +388,7 @@ because:
 - Dynamic registration supports runtime AID changes (e.g., user switches
   loyalty cards).
 - Manifest XML requires the consumer to edit `res/xml/` files or use manifest
-  placeholders -- fragile and not idiomatic for a KMP library.
+  placeholders - fragile and not idiomatic for a KMP library.
 
 For `PAYMENT` category AIDs, the consumer must first check:
 
@@ -524,7 +524,7 @@ class FakeHceService(
 
 ## Consumer Usage
 
-Minimal example -- emulating a loyalty card:
+Minimal example - emulating a loyalty card:
 
 ```kotlin
 class LoyaltyCardEmulator(private val database: LoyaltyDatabase) {
@@ -569,7 +569,7 @@ class LoyaltyCardEmulator(private val database: LoyaltyDatabase) {
 | Question | Resolution |
 |----------|-----------|
 | OffHostApduService (secure element routing) | Out of scope for v1. Add when consumer demand exists. |
-| SELECT AID auto-response | Consumer handles SELECT via `isSelectAid()` helper. Library does not auto-respond -- transparent pass-through is simpler. |
+| SELECT AID auto-response | Consumer handles SELECT via `isSelectAid()` helper. Library does not auto-respond - transparent pass-through is simpler. |
 | Multi-AID concurrent emulation | Android supports multiple AIDs per service. Already handled by `HceConfig.aids: List<AidRegistration>`. |
 | Payment category (default wallet) | Supported via `AidCategory.PAYMENT` + `PaymentNotDefault` error. Consumer must handle the Tap & Pay settings UX. |
 | iOS `CardSession` (EEA-gated) | Stubbed. `IosHceService` returns `NOT_SUPPORTED` until Apple opens the entitlement. API is designed to slot in without changes. |
@@ -585,4 +585,4 @@ class LoyaltyCardEmulator(private val database: LoyaltyDatabase) {
 | `DeactivationException` separate from `NfcException` | Deactivation is normal lifecycle (reader left). `NfcException` signals bugs/config errors. Conflating them forces `catch (NfcException)` to handle both. |
 | `@Volatile` singleton registry (no locks) | Single writer, sequential system calls. Consistent with project's "no atomics, no locks" policy. |
 | `android:required="false"` for HCE feature | Library works without HCE (reader mode is the primary feature). Forcing HCE would block install on devices without HCE-capable NFC controllers. |
-| Always `return null` from `processCommandApdu()` | Consistency over micro-optimization. Even fast processors go through the IO dispatcher -- the 0.5ms overhead of `sendResponseApdu()` is noise compared to RF latency. |
+| Always `return null` from `processCommandApdu()` | Consistency over micro-optimization. Even fast processors go through the IO dispatcher - the 0.5ms overhead of `sendResponseApdu()` is noise compared to RF latency. |
