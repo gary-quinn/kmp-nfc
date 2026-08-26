@@ -8,11 +8,15 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.atruedev.kmpnfc.adapter.NfcAdapter
 import com.atruedev.kmpnfc.hce.HceService
+import com.atruedev.kmpnfc.reader.ReaderOptions
 import com.atruedev.kmpnfc.sample.model.Screen
+import com.atruedev.kmpnfc.sample.scan.rememberScanSession
+import com.atruedev.kmpnfc.sample.ui.components.NfcAdapterBanner
 import com.atruedev.kmpnfc.sample.ui.screens.ApduConsoleScreen
 import com.atruedev.kmpnfc.sample.ui.screens.CapabilitiesScreen
 import com.atruedev.kmpnfc.sample.ui.screens.HceServerScreen
@@ -25,11 +29,14 @@ import com.atruedev.kmpnfc.testing.FakeNfcAdapter
 
 @Composable
 fun App() {
+    val scope = rememberCoroutineScope()
+    val scanSession = rememberScanSession()
     val realAdapter = remember { NfcAdapter() }
     val fakeAdapter = remember { FakeNfcAdapter() }
     var simulateMode by remember { mutableStateOf(false) }
     val adapter: NfcAdapter = if (simulateMode) fakeAdapter else realAdapter
     val hce = remember { HceService() }
+    var readerOptions by remember { mutableStateOf(ReaderOptions(alertMessage = "Hold near NFC tag")) }
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Home) }
 
     SampleTheme {
@@ -41,9 +48,11 @@ fun App() {
                     Screen.Home ->
                         HomeScreen(
                             adapter = adapter,
-                            fakeAdapter = if (simulateMode) fakeAdapter else null,
                             capabilities = adapter.capabilities,
                             simulateMode = simulateMode,
+                            scanSession = scanSession,
+                            readerOptions = readerOptions,
+                            onReaderOptionsChange = { readerOptions = it },
                             onSimulateModeChange = { simulateMode = it },
                             onTagSelected = { currentScreen = Screen.TagDetail(it) },
                             onCapabilities = { currentScreen = Screen.Capabilities },
@@ -65,10 +74,11 @@ fun App() {
 
                     Screen.SimulateTag ->
                         SimulateTagScreen(
-                            adapter = adapter,
                             fakeAdapter = if (simulateMode) fakeAdapter else null,
+                            scanSession = scanSession,
+                            scope = scope,
                             onBack = { currentScreen = Screen.Home },
-                            onTagDiscovered = { currentScreen = Screen.TagDetail(it) },
+                            onTagEmitted = { currentScreen = Screen.Home },
                         )
 
                     is Screen.TagDetail ->
@@ -104,6 +114,7 @@ fun App() {
 
     DisposableEffect(realAdapter) {
         onDispose {
+            scanSession.stop()
             realAdapter.close()
             fakeAdapter.close()
             hce.stop()

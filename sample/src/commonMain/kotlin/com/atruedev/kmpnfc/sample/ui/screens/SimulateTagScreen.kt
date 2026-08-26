@@ -10,25 +10,28 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.atruedev.kmpnfc.adapter.NfcAdapter
 import com.atruedev.kmpnfc.ndef.ndefMessage
+import com.atruedev.kmpnfc.sample.scan.ScanSession
 import com.atruedev.kmpnfc.sample.ui.components.SampleTopBar
 import com.atruedev.kmpnfc.tag.TagType
 import com.atruedev.kmpnfc.testing.FakeNfcAdapter
 import com.atruedev.kmpnfc.testing.fakeNfcTag
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
 fun SimulateTagScreen(
-    adapter: NfcAdapter,
     fakeAdapter: FakeNfcAdapter?,
+    scanSession: ScanSession,
+    scope: CoroutineScope,
     onBack: () -> Unit,
-    onTagDiscovered: (com.atruedev.kmpnfc.reader.NfcTag) -> Unit,
+    onTagEmitted: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val scanState by scanSession.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         SampleTopBar(title = "Simulate tag", onBack = onBack)
@@ -36,15 +39,24 @@ fun SimulateTagScreen(
             if (fakeAdapter == null) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "Simulation requires the fake adapter. Enable simulate mode on the home screen.",
+                        "Simulation requires simulate mode. Enable it on the home screen.",
                         modifier = Modifier.padding(16.dp),
                     )
                 }
                 return@Column
             }
 
+            if (!scanState.isScanning) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Start a scan on Home before emitting a simulated tag.",
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+
             Text(
-                "Emit a fake tag into the active reader session. Start scanning on Home first.",
+                "Emits a fake tag into the active reader session, then returns to Home.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Button(
@@ -63,14 +75,14 @@ fun SimulateTagScreen(
                                 onTransceive { byteArrayOf(0x90.toByte(), 0x00) }
                             }
                         fakeAdapter.emitTag(tag)
-                        onTagDiscovered(tag)
+                        onTagEmitted()
                     }
                 },
+                enabled = scanState.isScanning,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("Emit simulated tag")
             }
-            Text("Adapter state: ${adapter.state.value}", style = MaterialTheme.typography.bodySmall)
         }
     }
 }

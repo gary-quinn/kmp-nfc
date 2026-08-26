@@ -1,11 +1,17 @@
 package com.atruedev.kmpnfc.sample.viewmodel
 
+import androidx.compose.runtime.Composable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.atruedev.kmpnfc.error.NdefFormatError
 import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.TransceiveError
 import com.atruedev.kmpnfc.ndef.NdefMessage
 import com.atruedev.kmpnfc.ndef.ndefMessage
 import com.atruedev.kmpnfc.reader.NfcTag
+import com.atruedev.kmpnfc.sample.util.parseHexBytes
+import com.atruedev.kmpnfc.sample.util.toHexString
 import com.atruedev.kmpnfc.tag.TagTechnology
 import com.atruedev.kmpnfc.tag.TagType
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,18 +68,11 @@ class TagViewModel(
         viewModelScope.launch {
             runTagOp {
                 val bytes =
-                    commandHex
-                        .replace(" ", "")
-                        .chunked(2)
-                        .map { it.toInt(16).toByte() }
-                        .toByteArray()
+                    commandHex.parseHexBytes()
+                        ?: throw NfcException(TransceiveError("Invalid hex APDU command"))
                 _lastApduResponse.value = tag.transceive(bytes)
             }
         }
-    }
-
-    fun clearError() {
-        _error.value = null
     }
 
     private suspend fun runTagOp(block: suspend () -> Unit) {
@@ -84,17 +83,14 @@ class TagViewModel(
         } catch (e: NfcException) {
             _error.value = e
         } catch (e: IllegalArgumentException) {
-            _error.value =
-                NfcException(
-                    com.atruedev.kmpnfc.error
-                        .NdefFormatError(e.message ?: "Invalid input"),
-                )
+            _error.value = NfcException(NdefFormatError(e.message ?: "Invalid input"))
         } finally {
             _isLoading.value = false
         }
     }
-
-    override fun onCleared() {
-        tag.close()
-    }
 }
+
+fun tagViewModelKey(tag: NfcTag): String = tag.identifier.toHexString("")
+
+@Composable
+fun rememberTagViewModel(tag: NfcTag): TagViewModel = viewModel(key = tagViewModelKey(tag)) { TagViewModel(tag) }

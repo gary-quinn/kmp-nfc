@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // Compose Multiplatform plugin accessors remain the supported KMP wiring.
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
@@ -36,14 +38,12 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":"))
+            // Sample-only runtime dependency for simulate mode without NFC hardware.
+            // Production apps should use kmp-nfc-testing in tests, not at runtime.
             implementation(project(":kmp-nfc-testing"))
-            @Suppress("DEPRECATION")
             implementation(compose.runtime)
-            @Suppress("DEPRECATION")
             implementation(compose.foundation)
-            @Suppress("DEPRECATION")
             implementation(compose.material3)
-            @Suppress("DEPRECATION")
             implementation(compose.ui)
             implementation(libs.lifecycle.viewmodel.compose)
             implementation(libs.lifecycle.runtime.compose)

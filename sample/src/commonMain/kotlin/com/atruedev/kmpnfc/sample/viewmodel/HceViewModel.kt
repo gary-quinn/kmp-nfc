@@ -9,6 +9,7 @@ import com.atruedev.kmpnfc.hce.DeactivationException
 import com.atruedev.kmpnfc.hce.HceCapabilities
 import com.atruedev.kmpnfc.hce.HceConfig
 import com.atruedev.kmpnfc.hce.HceService
+import com.atruedev.kmpnfc.sample.util.isValidAidHex
 import com.atruedev.kmpnfc.tag.ApduCommand
 import com.atruedev.kmpnfc.tag.ApduResponse
 import kotlinx.coroutines.Job
@@ -40,6 +41,11 @@ class HceViewModel(
 
     fun start(aid: String) {
         if (_isRunning.value) return
+        val normalized = aid.replace(" ", "").uppercase()
+        if (!normalized.isValidAidHex()) {
+            _error.value = "AID must be 5-16 bytes as hex (10-32 characters)"
+            return
+        }
         _error.value = null
         _logs.value = emptyList()
         sessionJob =
@@ -51,7 +57,7 @@ class HceViewModel(
                             aids =
                                 listOf(
                                     AidRegistration(
-                                        aid = aid.uppercase(),
+                                        aid = normalized,
                                         category = AidCategory.OTHER,
                                     ),
                                 ),

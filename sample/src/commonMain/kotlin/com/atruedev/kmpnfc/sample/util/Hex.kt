@@ -17,3 +17,10 @@ fun String.parseHexBytes(): ByteArray? {
         cleaned.substring(start, start + 2).toInt(16).toByte()
     }
 }
+
+/** Validates an HCE AID: 5-16 bytes as hex (10-32 characters). */
+fun String.isValidAidHex(): Boolean {
+    val cleaned = replace(" ", "")
+    return cleaned.length in 10..32 &&
+        cleaned.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }
+}

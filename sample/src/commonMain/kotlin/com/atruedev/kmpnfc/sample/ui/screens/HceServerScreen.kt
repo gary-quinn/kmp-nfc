@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
@@ -39,7 +40,10 @@ fun HceServerScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         SampleTopBar(title = "HCE server", onBack = onBack)
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             if (!vm.capabilities.isSupported) {
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -72,11 +76,8 @@ fun HceServerScreen(
                 "Tap another phone running the reader with an ISO-DEP session. SELECT uses INS=A4, custom read uses INS=CA.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            androidx.compose.foundation.lazy.LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            ) {
-                items(logs.size) { index ->
-                    val entry = logs[index]
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(logs) { entry ->
                     Text("${entry.direction}: ${entry.summary}", style = MaterialTheme.typography.bodySmall)
                 }
             }

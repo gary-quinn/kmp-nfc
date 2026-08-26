@@ -41,6 +41,9 @@ jobs:
       - name: Build sample Android
         run: ./gradlew :sample:compileAndroidMain
 
+      - name: Assemble sample Android APK
+        run: ./gradlew :sample-android:assembleDebug
+
       - name: Test (Android host tests)
         run: ./gradlew testAndroidHostTest
 

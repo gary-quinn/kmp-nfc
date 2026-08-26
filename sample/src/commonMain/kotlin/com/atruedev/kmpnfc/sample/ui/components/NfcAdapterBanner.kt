@@ -1,4 +1,4 @@
-package com.atruedev.kmpnfc.sample
+package com.atruedev.kmpnfc.sample.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -17,11 +17,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.atruedev.kmpnfc.adapter.NfcAdapter
 import com.atruedev.kmpnfc.adapter.NfcAdapterState
-import com.atruedev.kmpnfc.sample.platform.openNfcSettings
+import com.atruedev.kmpnfc.sample.platform.rememberOpenNfcSettingsAction
 
 @Composable
 fun NfcAdapterBanner(adapter: NfcAdapter) {
     val state by adapter.state.collectAsState()
+    val openSettings = rememberOpenNfcSettingsAction()
 
     val message =
         when (state) {
@@ -45,7 +46,7 @@ fun NfcAdapterBanner(adapter: NfcAdapter) {
                     .fillMaxWidth()
                     .background(color)
                     .clickable(enabled = state == NfcAdapterState.OFF || state == NfcAdapterState.UNAUTHORIZED) {
-                        openNfcSettings()
+                        openSettings()
                     }.padding(12.dp),
             contentAlignment = Alignment.Center,
         ) {
