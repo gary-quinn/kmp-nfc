@@ -168,6 +168,47 @@ class HceServiceTest {
             assertFalse(hce.isStarted)
         }
 
+    @Test
+    fun processor_failure_propagates_to_start() =
+        runTest {
+            val hce = FakeHceService()
+            val failure = IllegalStateException("db down")
+            var thrown: Throwable? = null
+
+            val job =
+                launch {
+                    try {
+                        hce.start(
+                            config =
+                                HceConfig(
+                                    aids = listOf(AidRegistration("F0010203040506")),
+                                ),
+                        ) {
+                            throw failure
+                        }
+                    } catch (e: Throwable) {
+                        thrown = e
+                    }
+                }
+            delay(10)
+
+            runCatching {
+                hce.simulateCommand(
+                    ApduCommand(
+                        cla = 0x00.toByte(),
+                        ins = 0xA4.toByte(),
+                        p1 = 0x04.toByte(),
+                        p2 = 0x00.toByte(),
+                    ),
+                )
+            }
+            job.join()
+
+            assertTrue(thrown is IllegalStateException, "expected processor error, got $thrown")
+            assertEquals("db down", (thrown as IllegalStateException).message)
+            assertFalse(hce.isStarted)
+        }
+
     // --- Stop ---
 
     @Test

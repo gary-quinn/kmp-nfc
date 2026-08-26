@@ -5,11 +5,10 @@ package com.atruedev.kmpnfc.hce
  *
  * Query before calling [HceService.start] to avoid runtime surprises.
  *
- * | Platform | isSupported | canPaymentCategory |
- * |----------|------------|-------------------|
- * | Android  | true       | true              |
- * | iOS      | false      | false             |
- * | JVM      | false      | false             |
+ * | Field | Meaning |
+ * |-------|---------|
+ * | [isSupported] | Device has HCE hardware and this app can register AIDs |
+ * | [canPaymentCategory] | This app is the default Tap & Pay wallet (required for [AidCategory.PAYMENT]) |
  */
 public data class HceCapabilities(
     val isSupported: Boolean,

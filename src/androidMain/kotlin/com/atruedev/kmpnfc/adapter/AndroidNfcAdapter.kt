@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.nfc.NfcManager
 import android.nfc.Tag
 import android.nfc.tech.IsoDep
@@ -112,7 +113,10 @@ internal class AndroidNfcAdapter(
             // owns a foreground reader session - that is an app-manifest concern, not a
             // library capability.
             canBackgroundRead = false,
-            canHostCardEmulation = true,
+            canHostCardEmulation =
+                context.packageManager.hasSystemFeature(
+                    PackageManager.FEATURE_NFC_HOST_CARD_EMULATION,
+                ),
             supportedTagTypes =
                 setOf(
                     TagType.NFC_A,

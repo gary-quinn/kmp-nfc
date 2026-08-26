@@ -2,6 +2,7 @@ package com.atruedev.kmpnfc.hce
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.pm.PackageManager
 import android.nfc.NfcAdapter
 import android.nfc.cardemulation.CardEmulation
 import com.atruedev.kmpnfc.adapter.KmpNfc
@@ -17,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 
@@ -31,23 +33,25 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  */
 internal class AndroidHceService private constructor(
     private val appContext: Context,
-) : HceService {
+) : HceService,
+    HceSession {
     private val nfcAdapter: NfcAdapter? =
         appContext.getSystemService(Context.NFC_SERVICE) as? NfcAdapter
 
     private val cardEmulation: CardEmulation? =
         nfcAdapter?.let { CardEmulation.getInstance(it) }
 
+    private val hostComponent: ComponentName =
+        ComponentName(
+            appContext.packageName,
+            KmpNfcHostApduService::class.java.name,
+        )
+
     /** Non-null when [start] is suspended, null otherwise. */
     @Volatile
     private var session: Session? = null
 
-    override val capabilities: HceCapabilities =
-        if (nfcAdapter != null && cardEmulation != null) {
-            HceCapabilities(isSupported = true, canPaymentCategory = true)
-        } else {
-            HceCapabilities.NONE
-        }
+    override val capabilities: HceCapabilities = resolveCapabilities()
 
     override suspend fun start(
         config: HceConfig,
@@ -64,17 +68,15 @@ internal class AndroidHceService private constructor(
             cardEmulation
                 ?: throw NfcException(NotSupported("CardEmulation not available"))
 
-        val component =
-            ComponentName(
-                appContext.packageName,
-                KmpNfcHostApduService::class.java.name,
-            )
+        if (!appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION)) {
+            throw NfcException(NotSupported("Host card emulation is not supported on this device"))
+        }
 
         val paymentAids = config.aids.filter { it.category == AidCategory.PAYMENT }
         val otherAids = config.aids.filter { it.category == AidCategory.OTHER }
 
         if (paymentAids.isNotEmpty() &&
-            !emulation.isDefaultServiceForCategory(component, CardEmulation.CATEGORY_PAYMENT)
+            !emulation.isDefaultServiceForCategory(hostComponent, CardEmulation.CATEGORY_PAYMENT)
         ) {
             throw NfcException(
                 Unauthorized(
@@ -87,7 +89,7 @@ internal class AndroidHceService private constructor(
         if (otherAids.isNotEmpty()) {
             val success =
                 emulation.registerAidsForService(
-                    component,
+                    hostComponent,
                     CardEmulation.CATEGORY_OTHER,
                     otherAids.map { it.aid.uppercase() },
                 )
@@ -101,18 +103,19 @@ internal class AndroidHceService private constructor(
         if (paymentAids.isNotEmpty()) {
             val success =
                 emulation.registerAidsForService(
-                    component,
+                    hostComponent,
                     CardEmulation.CATEGORY_PAYMENT,
                     paymentAids.map { it.aid.uppercase() },
                 )
             if (!success) {
-                emulation.removeAidsForService(component, CardEmulation.CATEGORY_OTHER)
+                emulation.removeAidsForService(hostComponent, CardEmulation.CATEGORY_OTHER)
                 throw NfcException(Unauthorized("Failed to register payment AIDs."))
             }
         }
 
-        val scope = CoroutineScope(Dispatchers.IO + Job())
-        val current = Session(scope, processor, emulation, component, paymentAids, otherAids)
+        val commandDispatcher = Dispatchers.IO.limitedParallelism(1)
+        val scope = CoroutineScope(commandDispatcher + Job())
+        val current = Session(scope, processor, emulation, hostComponent, paymentAids, otherAids)
         session = current
 
         HceServiceRegistry.register(this)
@@ -122,38 +125,62 @@ internal class AndroidHceService private constructor(
                 current.continuation = cont
             }
         } catch (e: CancellationException) {
-            val cause = e.cause
-            if (cause is DeactivationException) throw cause
+            throw unwrapStartCancellation(e)
         } finally {
             current.cleanup()
         }
     }
 
     override fun stop() {
-        val s = session ?: return
-        s.continuation?.cancel()
+        session?.continuation?.cancel()
     }
 
     // --- Called from KmpNfcHostApduService ---
 
-    internal fun dispatch(command: ApduCommand) {
+    override fun dispatch(command: ApduCommand) {
         val s = session ?: return
         val proc = s.processor
         s.scope.launch {
             try {
+                if (!s.scope.isActive) return@launch
                 val response = proc(command)
+                if (!s.scope.isActive) return@launch
                 HceServiceRegistry.getHostService()?.sendResponseApdu(response.toBytes())
-            } catch (_: CancellationException) {
-                // Session ended - discard.
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                s.continuation?.cancel(CancellationException("Processor failed", e))
             }
         }
     }
 
-    internal fun onDeactivated(reason: DeactivationReason) {
-        val s = session ?: return
-        s.continuation?.cancel(
+    override fun onDeactivated(reason: DeactivationReason) {
+        session?.continuation?.cancel(
             CancellationException("Deactivated: $reason", DeactivationException(reason)),
         )
+    }
+
+    private fun resolveCapabilities(): HceCapabilities {
+        if (nfcAdapter == null || cardEmulation == null) return HceCapabilities.NONE
+        if (!appContext.packageManager.hasSystemFeature(PackageManager.FEATURE_NFC_HOST_CARD_EMULATION)) {
+            return HceCapabilities.NONE
+        }
+        return HceCapabilities(
+            isSupported = true,
+            canPaymentCategory =
+                cardEmulation.isDefaultServiceForCategory(
+                    hostComponent,
+                    CardEmulation.CATEGORY_PAYMENT,
+                ),
+        )
+    }
+
+    private fun unwrapStartCancellation(e: CancellationException): Throwable {
+        val cause = e.cause ?: return e
+        return when (cause) {
+            is DeactivationException -> cause
+            else -> cause
+        }
     }
 
     // --- Session ---

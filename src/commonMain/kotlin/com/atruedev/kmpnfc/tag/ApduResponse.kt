@@ -46,5 +46,8 @@ public data class ApduResponse(
 
         /** Class not supported (SW 6E00). */
         public fun classNotSupported(): ApduResponse = ApduResponse(byteArrayOf(), 0x6E.toByte(), 0x00)
+
+        /** Unspecified error (SW 6F00). */
+        public fun generalError(): ApduResponse = ApduResponse(byteArrayOf(), 0x6F.toByte(), 0x00.toByte())
     }
 }

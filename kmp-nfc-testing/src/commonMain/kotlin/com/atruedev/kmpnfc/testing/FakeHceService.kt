@@ -10,23 +10,20 @@ import com.atruedev.kmpnfc.tag.ApduCommand
 import com.atruedev.kmpnfc.tag.ApduResponse
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.concurrent.Volatile
 
 /**
  * Test double for [HceService].
  *
- * Allows tests to simulate incoming APDU commands and deactivation events.
- *
- * ```
- * val hce = FakeHceService()
- * hce.simulateStart(aids)
- *
- * val response = hce.simulateCommand(selectAid)
- * assertEquals(ApduResponse.success(), response)
- *
- * hce.simulateDeactivation(DeactivationReason.LINK_LOSS)
- * ```
+ * Launch [start] in a background coroutine, then drive commands with
+ * [simulateCommand] and [simulateDeactivation].
  */
 public class FakeHceService(
     override val capabilities: HceCapabilities =
@@ -46,6 +43,7 @@ public class FakeHceService(
         private set
 
     private var processor: (suspend (ApduCommand) -> ApduResponse)? = null
+    private var scope: CoroutineScope? = null
 
     @Volatile
     private var continuation: CancellableContinuation<Unit>? = null
@@ -60,16 +58,16 @@ public class FakeHceService(
         this.processor = processor
         isStarted = true
 
+        val commandDispatcher = Dispatchers.Default.limitedParallelism(1)
+        scope = CoroutineScope(commandDispatcher + Job())
+
         try {
             suspendCancellableCoroutine<Unit> { cont ->
                 continuation = cont
-                cont.invokeOnCancellation {
-                    cleanup()
-                }
+                cont.invokeOnCancellation { cleanup() }
             }
         } catch (e: CancellationException) {
-            val cause = e.cause
-            if (cause is DeactivationException) throw cause
+            throw unwrapStartCancellation(e)
         } finally {
             cleanup()
         }
@@ -82,39 +80,45 @@ public class FakeHceService(
     /**
      * Simulate an incoming APDU command from the external reader.
      *
-     * Suspends until the processor returns a response.
+     * Commands are processed serially, matching [AndroidHceService].
      */
     public suspend fun simulateCommand(command: ApduCommand): ApduResponse {
-        val proc = checkNotNull(processor) { "HCE not started. Call start() or simulateStart() first." }
-        val response = proc(command)
-        responses.add(response)
-        return response
+        val activeScope = checkNotNull(scope) { "HCE not started. Call start() first." }
+        val proc = checkNotNull(processor) { "HCE not started. Call start() first." }
+
+        return suspendCancellableCoroutine { cont ->
+            activeScope.launch {
+                try {
+                    if (!activeScope.isActive) return@launch
+                    val response = proc(command)
+                    responses.add(response)
+                    cont.resumeWith(Result.success(response))
+                } catch (e: CancellationException) {
+                    cont.cancel(e)
+                } catch (e: Throwable) {
+                    continuation?.resumeWith(Result.failure(e))
+                    cont.cancel(CancellationException("Processor failed", e))
+                }
+            }
+        }
     }
 
-    /**
-     * Simulate deactivation (reader moved away or deselected).
-     *
-     * Cancels the processor coroutine. If [start] was suspended,
-     * it resumes with [DeactivationException].
-     */
+    /** Simulate reader deactivation (LINK_LOSS or DESELECTED). */
     public fun simulateDeactivation(reason: DeactivationReason) {
         continuation?.resumeWith(Result.failure(DeactivationException(reason)))
     }
 
-    /** Convenience: start HCE for testing without a real processor. */
-    public suspend fun simulateStart(vararg aids: String) {
-        val aidRegistrations = aids.map { AidRegistration(it) }
-        registeredAids.clear()
-        registeredAids.addAll(aidRegistrations)
-        isStarted = true
-    }
-
-    /** Convenience: set the processor after simulateStart. */
-    public fun setProcessor(processor: suspend (ApduCommand) -> ApduResponse) {
-        this.processor = processor
+    private fun unwrapStartCancellation(e: CancellationException): Throwable {
+        val cause = e.cause ?: return e
+        return when (cause) {
+            is DeactivationException -> cause
+            else -> cause
+        }
     }
 
     private fun cleanup() {
+        scope?.cancel()
+        scope = null
         isStarted = false
         processor = null
         continuation = null

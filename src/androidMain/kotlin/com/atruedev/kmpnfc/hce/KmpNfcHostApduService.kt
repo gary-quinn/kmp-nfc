@@ -3,6 +3,7 @@ package com.atruedev.kmpnfc.hce
 import android.nfc.cardemulation.HostApduService
 import android.os.Bundle
 import com.atruedev.kmpnfc.tag.ApduCommand
+import com.atruedev.kmpnfc.tag.ApduResponse
 
 /**
  * Android [HostApduService] subclass registered in the library manifest.
@@ -29,8 +30,8 @@ public class KmpNfcHostApduService : HostApduService() {
      * Called by the NFC controller on the UI thread when an APDU command
      * is received from the external reader.
      *
-     * Always returns `null` - the response is sent asynchronously via
-     * [sendResponseApdu] from a background coroutine in [AndroidHceService].
+     * Returns `null` for valid commands (response sent asynchronously via
+     * [sendResponseApdu]). Returns an error APDU synchronously when parsing fails.
      */
     override fun processCommandApdu(
         commandApdu: ByteArray,
@@ -41,7 +42,7 @@ public class KmpNfcHostApduService : HostApduService() {
             try {
                 ApduCommand.fromBytes(commandApdu)
             } catch (_: IllegalArgumentException) {
-                return null
+                return ApduResponse.generalError().toBytes()
             }
         service.dispatch(command)
         return null

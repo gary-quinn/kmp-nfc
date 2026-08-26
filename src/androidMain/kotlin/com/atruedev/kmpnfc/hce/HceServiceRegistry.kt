@@ -6,31 +6,28 @@ import android.nfc.cardemulation.HostApduService
  * Process-scoped registry bridging Android's [HostApduService] (created by the
  * system) and the library's [AndroidHceService] (created by the consumer).
  *
- * Single-writer, sequential-reader pattern - no locks needed:
- * - [register] is called once from [AndroidHceService.start]
- * - [unregister] is called once from [AndroidHceService.cleanup]
- * - [get] is called from [KmpNfcHostApduService] on the UI thread, sequentially
+ * [session] is written once per active HCE session from [AndroidHceService.start].
+ * [hostService] is owned by the system [HostApduService] lifecycle.
  */
 internal object HceServiceRegistry {
     @Volatile
-    private var hceService: AndroidHceService? = null
+    private var session: HceSession? = null
 
     @Volatile
     private var hostService: HostApduService? = null
 
-    fun register(service: AndroidHceService) {
-        check(hceService == null) { "HCE service already active" }
-        hceService = service
+    fun register(service: HceSession) {
+        check(session == null) { "HCE service already active" }
+        session = service
     }
 
-    fun unregister(service: AndroidHceService) {
-        if (hceService === service) {
-            hceService = null
-            hostService = null
+    fun unregister(service: HceSession) {
+        if (session === service) {
+            session = null
         }
     }
 
-    fun get(): AndroidHceService? = hceService
+    fun get(): HceSession? = session
 
     fun setHostService(service: HostApduService) {
         hostService = service

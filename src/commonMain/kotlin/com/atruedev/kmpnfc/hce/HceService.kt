@@ -45,6 +45,7 @@ public interface HceService {
      *   an [ApduResponse].
      * @throws DeactivationException if the reader disconnects.
      * @throws IllegalStateException if an HCE session is already active.
+     * @throws Exception if the [processor] throws (propagates to the caller of [start]).
      */
     public suspend fun start(
         config: HceConfig,

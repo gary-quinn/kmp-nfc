@@ -4,15 +4,9 @@ package com.atruedev.kmpnfc.hce
  * Configuration for [HceService.start].
  *
  * @property aids AIDs to register for card emulation.
- * @property requireDeviceUnlock If true, HCE is disabled when the device is locked
- *   (Android only, ignored on other platforms).
- * @property description Human-readable description shown in system Tap & Pay settings
- *   (Android only, ignored on other platforms).
  */
 public data class HceConfig(
     val aids: List<AidRegistration>,
-    val requireDeviceUnlock: Boolean = false,
-    val description: String? = null,
 )
 
 /**

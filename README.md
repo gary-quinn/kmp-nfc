@@ -96,6 +96,9 @@ ISO 7816-4 APDU commands; your app responds via a suspend processor:
 ```kotlin
 val hce = HceService()
 if (!hce.capabilities.isSupported) return
+if (!hce.capabilities.canPaymentCategory) {
+    // Prompt user to set app as default Tap & Pay before AidCategory.PAYMENT
+}
 
 try {
     hce.start(
