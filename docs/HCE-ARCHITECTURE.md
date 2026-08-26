@@ -113,17 +113,42 @@ the documented async pattern. Design C maps directly to this.
 
 Two categories of error:
 
-**Configuration errors** (thrown before `start()` suspends - use existing `NfcException`):
+**Configuration errors** (thrown before `start()` suspends):
 
-```
-NfcError (sealed interface)
-  AdapterError
-    NotSupported        - no NFC hardware
-    AdapterDisabled     - NFC is off
-    Unauthorized        - permission denied
-  HceError (new sealed interface)
-    AidConflict         - another app registered the same AID
-    PaymentNotDefault   - payment AIDs but app not default wallet
+HCE reuses the existing `NfcException` / `AdapterError` types. There are no
+HCE-specific sealed error types (`HceError`, `AidConflict`, etc.) in v1.
+Distinguish cases by matching on `NfcException.error` and reading `message`.
+
+| Condition | Exception | `NfcException.error` |
+|-----------|-----------|----------------------|
+| `start()` called while a session is already active | `IllegalStateException` | (not an `NfcException`) |
+| No NFC hardware | `NfcException` | `NotSupported` (default message) |
+| NFC disabled in settings | `NfcException` | `AdapterDisabled` |
+| `CardEmulation` unavailable | `NfcException` | `NotSupported("CardEmulation not available")` |
+| Payment AIDs but app is not the default Tap & Pay wallet | `NfcException` | `Unauthorized("Payment AIDs require the app to be the default Tap & Pay wallet. ...")` |
+| `registerAidsForService()` failed for `AidCategory.OTHER` | `NfcException` | `Unauthorized("Failed to register AIDs. Another app may own these AIDs.")` |
+| `registerAidsForService()` failed for `AidCategory.PAYMENT` | `NfcException` | `Unauthorized("Failed to register payment AIDs.")` |
+| HCE not supported on platform (iOS/JVM stub) | `NfcException` | `NotSupported` with platform-specific message |
+
+Example handling:
+
+```kotlin
+try {
+    hce.start(config) { command -> /* ... */ }
+} catch (e: NfcException) {
+    when (e.error) {
+        is NotSupported -> /* no hardware, CardEmulation missing, or iOS stub */
+        is AdapterDisabled -> /* prompt user to enable NFC */
+        is Unauthorized -> when {
+            e.message.contains("default Tap & Pay") -> /* payment wallet UX */
+            e.message.contains("register") -> /* AID conflict or registration failure */
+            else -> /* other permission issues */
+        }
+        else -> /* unexpected adapter error */
+    }
+} catch (e: IllegalStateException) {
+    /* double start() */
+}
 ```
 
 **Runtime deactivation** (thrown AFTER `start()` is suspended):
@@ -402,8 +427,9 @@ if (!cardEmulation.isDefaultServiceForCategory(
 }
 ```
 
-The library throws `PaymentNotDefault` if payment AIDs are registered without
-the app being the default wallet.
+The library throws `NfcException(Unauthorized(...))` if payment AIDs are
+registered without the app being the default wallet (message contains
+`default Tap & Pay`).
 
 ## iOS Stub
 
@@ -571,9 +597,9 @@ class LoyaltyCardEmulator(private val database: LoyaltyDatabase) {
 | OffHostApduService (secure element routing) | Out of scope for v1. Add when consumer demand exists. |
 | SELECT AID auto-response | Consumer handles SELECT via `isSelectAid()` helper. Library does not auto-respond - transparent pass-through is simpler. |
 | Multi-AID concurrent emulation | Android supports multiple AIDs per service. Already handled by `HceConfig.aids: List<AidRegistration>`. |
-| Payment category (default wallet) | Supported via `AidCategory.PAYMENT` + `PaymentNotDefault` error. Consumer must handle the Tap & Pay settings UX. |
+| Payment category (default wallet) | Supported via `AidCategory.PAYMENT`. Library throws `NfcException(Unauthorized)` when the app is not the default Tap & Pay wallet. Consumer must handle the settings UX. |
 | iOS `CardSession` (EEA-gated) | Stubbed. `IosHceService` returns `NOT_SUPPORTED` until Apple opens the entitlement. API is designed to slot in without changes. |
-| Service discovery / AID conflict resolution | Android handles this at the platform level. Library exposes `AidConflict` error when `registerAidsForService()` fails. |
+| Service discovery / AID conflict resolution | Android handles this at the platform level. Library throws `NfcException(Unauthorized)` when `registerAidsForService()` returns `false`. |
 
 ## Design Decisions Summary
 
