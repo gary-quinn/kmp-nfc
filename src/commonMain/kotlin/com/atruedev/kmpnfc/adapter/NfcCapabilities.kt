@@ -18,6 +18,8 @@ public data class NfcCapabilities(
     val canReadRawTag: Boolean,
     /** Whether background tag reading is supported. False on Android (needs foreground); true on iOS (URL tags only). */
     val canBackgroundRead: Boolean,
+    /** Whether Host Card Emulation is supported. True on Android, false on iOS/JVM. */
+    val canHostCardEmulation: Boolean,
     /** Tag types supported by this device's NFC hardware. */
     val supportedTagTypes: Set<TagType>,
 ) {
@@ -29,6 +31,7 @@ public data class NfcCapabilities(
                 canWriteNdef = false,
                 canReadRawTag = false,
                 canBackgroundRead = false,
+                canHostCardEmulation = false,
                 supportedTagTypes = emptySet(),
             )
     }

@@ -45,6 +45,13 @@ class ApduTest {
     }
 
     @Test
+    fun generalErrorResponseHasCorrectStatusWords() {
+        val response = ApduResponse.generalError()
+        assertEquals(0x6F.toByte(), response.sw1)
+        assertEquals(0x00.toByte(), response.sw2)
+    }
+
+    @Test
     fun toBytesSerializesCorrectly() {
         val response = ApduResponse.success(byteArrayOf(0x42))
         val bytes = response.toBytes()

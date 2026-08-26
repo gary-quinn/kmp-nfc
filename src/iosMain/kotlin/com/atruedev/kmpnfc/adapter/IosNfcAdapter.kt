@@ -125,6 +125,7 @@ internal class IosNfcAdapter : NfcAdapter {
             canWriteNdef = isIos13Plus,
             canReadRawTag = isIos13Plus,
             canBackgroundRead = true,
+            canHostCardEmulation = false,
             supportedTagTypes =
                 if (isIos13Plus) {
                     setOf(TagType.NFC_A, TagType.NFC_B, TagType.NFC_F, TagType.NFC_V, TagType.ISO_DEP)

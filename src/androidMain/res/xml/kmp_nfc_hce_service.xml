@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<host-apdu-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:requireDeviceUnlock="false">
+    <!-- AIDs are registered dynamically at runtime via CardEmulation.registerAidsForService() -->
+    <aid-group android:category="other" android:description="@string/kmp_nfc_hce_service_desc" />
+</host-apdu-service>

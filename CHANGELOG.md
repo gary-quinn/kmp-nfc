@@ -11,7 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Changes on `main` that have not yet been tagged for release._
+### Added
+- feat: Host Card Emulation (HCE) on Android via `HceService` API
+- `FakeHceService` test double in kmp-nfc-testing
+- `NfcCapabilities.canHostCardEmulation` capability flag
+- `ApduResponse.generalError()` (SW 6F00) for malformed inbound APDUs
+- Architecture doc: [docs/HCE-ARCHITECTURE.md](docs/HCE-ARCHITECTURE.md)
+
+### Changed
+- HCE: serialize APDU handling with `limitedParallelism(1)`; propagate processor exceptions to `start()`
+- HCE: `canPaymentCategory` reflects default Tap & Pay wallet status, not a hardcoded `true`
+- HCE: invalid inbound APDUs return `6F00` instead of silent `null`
+- Trimmed `HCE-ARCHITECTURE.md` to match implementation scope
+
+### Removed
+- `HceConfig.requireDeviceUnlock` and `HceConfig.description` (were not wired on Android)
+- `DeactivationReason.STOPPED` (`stop()` ends `start()` normally without throwing)
 
 ---
 

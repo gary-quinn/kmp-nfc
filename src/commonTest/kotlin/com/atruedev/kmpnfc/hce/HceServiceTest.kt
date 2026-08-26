@@ -1,0 +1,299 @@
+package com.atruedev.kmpnfc.hce
+
+import com.atruedev.kmpnfc.tag.ApduCommand
+import com.atruedev.kmpnfc.tag.ApduResponse
+import com.atruedev.kmpnfc.testing.FakeHceService
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class HceServiceTest {
+    @Test
+    fun capabilities_isSupported_true() {
+        val hce = FakeHceService()
+        assertTrue(hce.capabilities.isSupported)
+    }
+
+    @Test
+    fun capabilities_HceCapabilities_NONE() {
+        val caps = HceCapabilities.NONE
+        assertFalse(caps.isSupported)
+        assertFalse(caps.canPaymentCategory)
+    }
+
+    @Test
+    fun start_registersAids() =
+        runTest {
+            val hce = FakeHceService()
+            val job = backgroundStart(hce, AidRegistration("F0010203040506"))
+            delay(10)
+
+            assertEquals(1, hce.registeredAids.size)
+            assertEquals("F0010203040506", hce.registeredAids[0].aid)
+
+            hce.stop()
+            job.join()
+        }
+
+    @Test
+    fun processor_receives_select_aid() =
+        runTest {
+            val hce = FakeHceService()
+            val selectApdu =
+                ApduCommand(
+                    cla = 0x00.toByte(),
+                    ins = 0xA4.toByte(),
+                    p1 = 0x04.toByte(),
+                    p2 = 0x00.toByte(),
+                    data =
+                        byteArrayOf(
+                            0xF0.toByte(),
+                            0x01,
+                            0x02,
+                            0x03,
+                            0x04,
+                            0x05,
+                            0x06,
+                        ),
+                )
+
+            var receivedCommand: ApduCommand? = null
+
+            val job =
+                launch {
+                    hce.start(
+                        config =
+                            HceConfig(
+                                aids = listOf(AidRegistration("F0010203040506")),
+                            ),
+                    ) { command ->
+                        receivedCommand = command
+                        ApduResponse.success()
+                    }
+                }
+            delay(10)
+
+            val response = hce.simulateCommand(selectApdu)
+            assertEquals(0x90.toByte(), response.sw1)
+            assertEquals(0x00.toByte(), response.sw2)
+
+            val cmd = receivedCommand ?: error("Expected command")
+            assertEquals(0x00.toByte(), cmd.cla)
+            assertEquals(0xA4.toByte(), cmd.ins)
+
+            hce.stop()
+            job.join()
+        }
+
+    @Test
+    fun responses_are_recorded() =
+        runTest {
+            val hce = FakeHceService()
+            val job =
+                launch {
+                    hce.start(
+                        config =
+                            HceConfig(
+                                aids = listOf(AidRegistration("A00000000101")),
+                            ),
+                    ) {
+                        ApduResponse.success(byteArrayOf(0x01, 0x02))
+                    }
+                }
+            delay(10)
+
+            hce.simulateCommand(
+                ApduCommand(
+                    cla = 0x00.toByte(),
+                    ins = 0xB0.toByte(),
+                    p1 = 0x00.toByte(),
+                    p2 = 0x00.toByte(),
+                ),
+            )
+
+            assertEquals(1, hce.responses.size)
+            assertEquals(byteArrayOf(0x01, 0x02).toList(), hce.responses[0].data.toList())
+            assertEquals(0x90.toByte(), hce.responses[0].sw1)
+
+            hce.stop()
+            job.join()
+        }
+
+    @Test
+    fun deactivation_cancels_processor() =
+        runTest {
+            val hce = FakeHceService()
+            var processorCancelled = false
+
+            val job =
+                launch {
+                    try {
+                        hce.start(
+                            config =
+                                HceConfig(
+                                    aids = listOf(AidRegistration("F0010203040506")),
+                                ),
+                        ) {
+                            delay(1000)
+                            ApduResponse.success()
+                        }
+                    } catch (e: DeactivationException) {
+                        processorCancelled = true
+                        assertEquals(DeactivationReason.LINK_LOSS, e.reason)
+                    }
+                }
+            delay(10)
+
+            hce.simulateDeactivation(DeactivationReason.LINK_LOSS)
+            job.join()
+
+            assertTrue(processorCancelled)
+            assertFalse(hce.isStarted)
+        }
+
+    @Test
+    fun processor_failure_propagates_to_start() =
+        runTest {
+            val hce = FakeHceService()
+            val failure = IllegalStateException("db down")
+            var thrown: Throwable? = null
+
+            val job =
+                launch {
+                    try {
+                        hce.start(
+                            config =
+                                HceConfig(
+                                    aids = listOf(AidRegistration("F0010203040506")),
+                                ),
+                        ) {
+                            throw failure
+                        }
+                    } catch (e: Throwable) {
+                        thrown = e
+                    }
+                }
+            delay(10)
+
+            runCatching {
+                hce.simulateCommand(
+                    ApduCommand(
+                        cla = 0x00.toByte(),
+                        ins = 0xA4.toByte(),
+                        p1 = 0x04.toByte(),
+                        p2 = 0x00.toByte(),
+                    ),
+                )
+            }
+            job.join()
+
+            assertTrue(thrown is IllegalStateException, "expected processor error, got $thrown")
+            assertEquals("db down", (thrown as IllegalStateException).message)
+            assertFalse(hce.isStarted)
+        }
+
+    @Test
+    fun stop_ends_session() =
+        runTest {
+            val hce = FakeHceService()
+            val job =
+                launch {
+                    hce.start(
+                        config =
+                            HceConfig(
+                                aids = listOf(AidRegistration("F0010203040506")),
+                            ),
+                    ) {
+                        ApduResponse.success()
+                    }
+                }
+            delay(10)
+            assertTrue(hce.isStarted)
+
+            hce.stop()
+            job.join()
+            assertFalse(hce.isStarted)
+        }
+
+    @Test
+    fun double_start_throws() =
+        runTest {
+            val hce = FakeHceService()
+            val job =
+                launch {
+                    hce.start(
+                        config =
+                            HceConfig(
+                                aids = listOf(AidRegistration("F0010203040506")),
+                            ),
+                    ) {
+                        ApduResponse.success()
+                    }
+                }
+            delay(10)
+
+            assertFailsWith<IllegalStateException> {
+                hce.start(
+                    config =
+                        HceConfig(
+                            aids = listOf(AidRegistration("A00000000101")),
+                        ),
+                ) {
+                    ApduResponse.success()
+                }
+            }
+
+            hce.stop()
+            job.join()
+        }
+
+    @Test
+    fun stop_when_idle_is_noop() {
+        val hce = FakeHceService()
+        hce.stop()
+    }
+
+    @Test
+    fun start_registers_multiple_aids() =
+        runTest {
+            val hce = FakeHceService()
+            val job =
+                backgroundStart(
+                    hce,
+                    AidRegistration("F0010203040506"),
+                    AidRegistration("A00000000101", AidCategory.PAYMENT),
+                )
+            delay(10)
+
+            assertEquals(2, hce.registeredAids.size)
+            assertEquals("F0010203040506", hce.registeredAids[0].aid)
+            assertEquals(AidCategory.OTHER, hce.registeredAids[0].category)
+            assertEquals("A00000000101", hce.registeredAids[1].aid)
+            assertEquals(AidCategory.PAYMENT, hce.registeredAids[1].category)
+
+            hce.stop()
+            job.join()
+        }
+
+    private fun TestScope.backgroundStart(
+        hce: FakeHceService,
+        vararg aids: AidRegistration,
+    ): Job =
+        launch {
+            hce.start(
+                config =
+                    HceConfig(
+                        aids = aids.toList(),
+                    ),
+            ) {
+                ApduResponse.success()
+            }
+        }
+}

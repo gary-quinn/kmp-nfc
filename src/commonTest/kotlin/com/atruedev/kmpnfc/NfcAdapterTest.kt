@@ -92,6 +92,7 @@ class NfcAdapterTest {
                 canWriteNdef = false,
                 canReadRawTag = false,
                 canBackgroundRead = true,
+                canHostCardEmulation = false,
                 supportedTagTypes = setOf(TagType.NFC_A),
             )
         val adapter = FakeNfcAdapter(capabilities = caps)
