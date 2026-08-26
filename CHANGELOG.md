@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Changes on `main` that have not yet been tagged for release._
+### Added
+- feat: Host Card Emulation (HCE) on Android via `HceService` API
+- `FakeHceService` test double in kmp-nfc-testing
+- `NfcCapabilities.canHostCardEmulation` capability flag
+- Architecture doc: [docs/HCE-ARCHITECTURE.md](docs/HCE-ARCHITECTURE.md)
 
 ---
 

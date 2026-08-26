@@ -1,6 +1,6 @@
 # kmp-nfc
 
-> Kotlin Multiplatform NFC library for Android & iOS - tag reading, NDEF, raw APDU transceive.
+> Kotlin Multiplatform NFC library for Android & iOS - tag reading, NDEF, raw APDU transceive, Host Card Emulation (Android).
 
 ## What is kmp-nfc?
 
@@ -113,8 +113,33 @@ println("Read NDEF: ${caps.canReadNdef}")
 println("Write NDEF: ${caps.canWriteNdef}")
 println("Raw transceive: ${caps.canReadRawTag}")
 println("Background: ${caps.canBackgroundRead}")
+println("HCE: ${caps.canHostCardEmulation}")
 println("Tag types: ${caps.supportedTagTypes}")
 ```
+
+### Host Card Emulation (Android)
+
+```kotlin
+val hce = HceService()
+if (!hce.capabilities.isSupported) return
+
+try {
+    hce.start(
+        config = HceConfig(aids = listOf(AidRegistration("F0010203040506"))),
+    ) { command ->
+        when {
+            command.isSelectAid() -> ApduResponse.success()
+            else -> ApduResponse.instructionNotSupported()
+        }
+    }
+} catch (e: DeactivationException) {
+    // Reader disconnected
+}
+
+hce.stop()
+```
+
+iOS: `HceService` returns `NOT_SUPPORTED` (requires EEA org entitlement).
 
 ### Testing Without Hardware
 
@@ -137,6 +162,10 @@ val failingTag = fakeNfcTag { failWith(TagLost()) }
 // State simulation
 adapter.simulateDisabled()
 adapter.simulateEnabled()
+
+// HCE testing
+val hce = FakeHceService()
+// Use in runTest with background launch { hce.start(...) }
 ```
 
 ## Error Handling

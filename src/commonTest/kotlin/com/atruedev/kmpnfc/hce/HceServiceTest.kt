@@ -3,8 +3,10 @@ package com.atruedev.kmpnfc.hce
 import com.atruedev.kmpnfc.tag.ApduCommand
 import com.atruedev.kmpnfc.tag.ApduResponse
 import com.atruedev.kmpnfc.testing.FakeHceService
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,6 +37,7 @@ class HceServiceTest {
         runTest {
             val hce = FakeHceService()
             val job = backgroundStart(hce, AidRegistration("F0010203040506"))
+            delay(10)
 
             assertEquals(1, hce.registeredAids.size)
             assertEquals("F0010203040506", hce.registeredAids[0].aid)
@@ -244,6 +247,7 @@ class HceServiceTest {
                     AidRegistration("F0010203040506"),
                     AidRegistration("A00000000101", AidCategory.PAYMENT),
                 )
+            delay(10)
 
             assertEquals(2, hce.registeredAids.size)
             assertEquals("F0010203040506", hce.registeredAids[0].aid)
@@ -331,10 +335,10 @@ class HceServiceTest {
 
     // --- Helpers ---
 
-    private suspend fun backgroundStart(
+    private fun TestScope.backgroundStart(
         hce: FakeHceService,
         vararg aids: AidRegistration,
-    ) = kotlinx.coroutines.coroutineScope {
+    ): Job =
         launch {
             hce.start(
                 config =
@@ -344,8 +348,5 @@ class HceServiceTest {
             ) {
                 ApduResponse.success()
             }
-        }.also {
-            delay(10)
         }
-    }
 }

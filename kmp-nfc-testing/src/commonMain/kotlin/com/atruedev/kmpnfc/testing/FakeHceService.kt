@@ -8,12 +8,10 @@ import com.atruedev.kmpnfc.hce.HceConfig
 import com.atruedev.kmpnfc.hce.HceService
 import com.atruedev.kmpnfc.tag.ApduCommand
 import com.atruedev.kmpnfc.tag.ApduResponse
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.concurrent.Volatile
 
 /**
  * Test double for [HceService].
@@ -48,7 +46,9 @@ public class FakeHceService(
         private set
 
     private var processor: (suspend (ApduCommand) -> ApduResponse)? = null
-    private var scope: CoroutineScope? = null
+
+    @Volatile
+    private var continuation: CancellableContinuation<Unit>? = null
 
     override suspend fun start(
         config: HceConfig,
@@ -60,24 +60,23 @@ public class FakeHceService(
         this.processor = processor
         isStarted = true
 
-        val jobScope = CoroutineScope(Dispatchers.Default + Job())
-        scope = jobScope
-
         try {
             suspendCancellableCoroutine<Unit> { cont ->
+                continuation = cont
                 cont.invokeOnCancellation {
-                    isStarted = false
-                    this.processor = null
-                    scope = null
+                    cleanup()
                 }
             }
-        } catch (_: CancellationException) {
-            // Normal: stop() or simulateDeactivation()
+        } catch (e: CancellationException) {
+            val cause = e.cause
+            if (cause is DeactivationException) throw cause
+        } finally {
+            cleanup()
         }
     }
 
     override fun stop() {
-        scope?.cancel()
+        continuation?.cancel()
     }
 
     /**
@@ -99,16 +98,12 @@ public class FakeHceService(
      * it resumes with [DeactivationException].
      */
     public fun simulateDeactivation(reason: DeactivationReason) {
-        scope?.cancel(
-            CancellationException("Deactivated: $reason", DeactivationException(reason)),
-        )
+        continuation?.resumeWith(Result.failure(DeactivationException(reason)))
     }
 
     /** Convenience: start HCE for testing without a real processor. */
     public suspend fun simulateStart(vararg aids: String) {
-        // Launch start in background so simulateCommand works.
         val aidRegistrations = aids.map { AidRegistration(it) }
-        scope = CoroutineScope(Dispatchers.Default + Job())
         registeredAids.clear()
         registeredAids.addAll(aidRegistrations)
         isStarted = true
@@ -117,5 +112,11 @@ public class FakeHceService(
     /** Convenience: set the processor after simulateStart. */
     public fun setProcessor(processor: suspend (ApduCommand) -> ApduResponse) {
         this.processor = processor
+    }
+
+    private fun cleanup() {
+        isStarted = false
+        processor = null
+        continuation = null
     }
 }

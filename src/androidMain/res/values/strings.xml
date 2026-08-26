@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="kmp_nfc_hce_service_desc">kmp-nfc Host Card Emulation</string>
+</resources>

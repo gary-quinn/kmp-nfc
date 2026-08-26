@@ -14,8 +14,8 @@ Part of the wireless trifecta: [kmp-ble](https://github.com/gary-quinn/kmp-ble) 
 
 | Module | Artifact | Description |
 |--------|----------|-------------|
-| **kmp-nfc** | `com.atruedev:kmp-nfc` | Core NFC - tag reading, NDEF read/write, raw transceive (ISO 7816-4 APDU) |
-| **kmp-nfc-testing** | `com.atruedev:kmp-nfc-testing` | Test doubles - `FakeNfcAdapter`, `FakeNfcTag` with error injection and delay simulation |
+| **kmp-nfc** | `com.atruedev:kmp-nfc` | Core NFC - tag reading, NDEF read/write, raw transceive (ISO 7816-4 APDU), Host Card Emulation (Android) |
+| **kmp-nfc-testing** | `com.atruedev:kmp-nfc-testing` | Test doubles - `FakeNfcAdapter`, `FakeNfcTag`, `FakeHceService` with error injection and delay simulation |
 
 ## Setup
 
@@ -85,7 +85,34 @@ val caps = adapter.capabilities
 if (caps.canReadNdef) { /* NDEF reading available */ }
 if (caps.canWriteNdef) { /* NDEF writing available (iOS 13+) */ }
 if (caps.canReadRawTag) { /* Raw transceive available */ }
+if (caps.canHostCardEmulation) { /* HCE available (Android only) */ }
 ```
+
+### Host Card Emulation (Android)
+
+Make the device act as a contactless smart card. An external NFC reader sends
+ISO 7816-4 APDU commands; your app responds via a suspend processor:
+
+```kotlin
+val hce = HceService()
+if (!hce.capabilities.isSupported) return
+
+try {
+    hce.start(
+        config = HceConfig(aids = listOf(AidRegistration("F0010203040506"))),
+    ) { command ->
+        when {
+            command.isSelectAid() -> ApduResponse.success()
+            else -> ApduResponse.instructionNotSupported()
+        }
+    }
+} catch (e: DeactivationException) {
+    // Reader disconnected
+}
+```
+
+iOS returns `NOT_SUPPORTED` until Apple opens the `com.apple.developer.nfc.hce`
+entitlement. See [docs/HCE-ARCHITECTURE.md](docs/HCE-ARCHITECTURE.md) for design details.
 
 ### Read NFC tags
 
@@ -178,6 +205,7 @@ NFC has significant platform asymmetry. kmp-nfc exposes this through `NfcCapabil
 | NDEF Write | Yes | Yes (iOS 13+) |
 | Raw Transceive | Yes (all tag types) | Yes (ISO 7816, MiFare) |
 | Background Read | No (both scan modes require foreground) | Yes (URL tags only, system-managed) |
+| Host Card Emulation | Yes | No (EEA entitlement required) |
 | Tag Types | NFC-A/B/F/V, ISO-DEP, MIFARE | NFC-A/B/F/V, ISO-DEP |
 | Session UX | Transparent | System NFC sheet |
 

@@ -30,10 +30,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * process, scoped to [KmpNfc.appContext].
  */
 internal class AndroidHceService private constructor(
-    context: Context,
+    private val appContext: Context,
 ) : HceService {
     private val nfcAdapter: NfcAdapter? =
-        context.getSystemService(Context.NFC_SERVICE) as? NfcAdapter
+        appContext.getSystemService(Context.NFC_SERVICE) as? NfcAdapter
 
     private val cardEmulation: CardEmulation? =
         nfcAdapter?.let { CardEmulation.getInstance(it) }
@@ -64,7 +64,6 @@ internal class AndroidHceService private constructor(
             cardEmulation
                 ?: throw NfcException(NotSupported("CardEmulation not available"))
 
-        val appContext = context.applicationContext
         val component =
             ComponentName(
                 appContext.packageName,
