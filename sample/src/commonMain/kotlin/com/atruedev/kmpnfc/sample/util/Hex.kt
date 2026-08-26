@@ -22,5 +22,6 @@ fun String.parseHexBytes(): ByteArray? {
 fun String.isValidAidHex(): Boolean {
     val cleaned = replace(" ", "")
     return cleaned.length in 10..32 &&
+        cleaned.length % 2 == 0 &&
         cleaned.all { it in '0'..'9' || it in 'A'..'F' || it in 'a'..'f' }
 }

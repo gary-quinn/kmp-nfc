@@ -8,10 +8,5 @@
     <false/>
     <key>NFCReaderUsageDescription</key>
     <string>Scan NFC tags to demonstrate kmp-nfc.</string>
-    <key>com.apple.developer.nfc.readersession.formats</key>
-    <array>
-        <string>NDEF</string>
-        <string>TAG</string>
-    </array>
 </dict>
 </plist>

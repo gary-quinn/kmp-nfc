@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.atruedev.kmpnfc.sample"
+    namespace = "com.atruedev.kmpnfc.sample.android"
     compileSdk =
         libs.versions.androidCompileSdk
             .get()
