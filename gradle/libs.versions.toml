@@ -4,8 +4,12 @@ dokka = "2.2.0"
 ktlint = "14.2.0"
 agp = "9.3.1"
 coroutines = "1.11.0"
+composeMultiplatform = "1.11.1"
+androidxLifecycle = "2.11.0"
+androidxActivityCompose = "1.13.0"
 androidMinSdk = "21"
 androidCompileSdk = "37"
+androidTargetSdk = "36"
 androidx-core = "1.19.0"
 turbine = "1.2.1"
 
@@ -16,11 +20,17 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-startup = { module = "androidx.startup:startup-runtime", version = "1.2.0" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidxActivityCompose" }
+lifecycle-viewmodel-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidxLifecycle" }
+lifecycle-runtime-compose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidxLifecycle" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 vanniktech-publish = { id = "com.vanniktech.maven.publish", version = "0.37.0" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }

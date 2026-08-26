@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CADisableMinimumFrameDurationOnPhone</key>
+    <true/>
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    <key>NFCReaderUsageDescription</key>
+    <string>Scan NFC tags to demonstrate kmp-nfc.</string>
+    <key>com.apple.developer.nfc.readersession.formats</key>
+    <array>
+        <string>NDEF</string>
+        <string>TAG</string>
+    </array>
+</dict>
+</plist>

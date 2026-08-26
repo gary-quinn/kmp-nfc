@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 rootProject.name = "kmp-nfc"
 
 include(":kmp-nfc-testing")
+include(":sample")
+include(":sample-android")

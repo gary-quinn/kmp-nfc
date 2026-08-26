@@ -38,6 +38,9 @@ jobs:
       - name: Build Android
         run: ./gradlew compileAndroidMain
 
+      - name: Build sample Android
+        run: ./gradlew :sample:compileAndroidMain
+
       - name: Test (Android host tests)
         run: ./gradlew testAndroidHostTest
 
@@ -78,6 +81,9 @@ jobs:
 
       - name: Build iOS
         run: ./gradlew compileKotlinIosSimulatorArm64
+
+      - name: Build sample iOS
+        run: ./gradlew :sample:compileKotlinIosSimulatorArm64
 
       - name: Test (common on iOS)
         run: ./gradlew iosSimulatorArm64Test

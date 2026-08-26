@@ -1,0 +1,57 @@
+plugins {
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.ktlint)
+}
+
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
+    android {
+        namespace = "com.atruedev.kmpnfc.sample"
+        compileSdk =
+            libs.versions.androidCompileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.androidMinSdk
+                .get()
+                .toInt()
+    }
+
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64(),
+    ).forEach { target ->
+        target.binaries.framework {
+            baseName = "KmpNfcSample"
+            isStatic = true
+        }
+    }
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(project(":"))
+            implementation(project(":kmp-nfc-testing"))
+            @Suppress("DEPRECATION")
+            implementation(compose.runtime)
+            @Suppress("DEPRECATION")
+            implementation(compose.foundation)
+            @Suppress("DEPRECATION")
+            implementation(compose.material3)
+            @Suppress("DEPRECATION")
+            implementation(compose.ui)
+            implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.lifecycle.runtime.compose)
+            implementation(libs.kotlinx.coroutines.core)
+        }
+        androidMain.dependencies {
+            implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.androidx.activity.compose)
+        }
+    }
+}
