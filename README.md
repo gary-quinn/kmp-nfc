@@ -17,6 +17,16 @@ Part of the wireless trifecta: [kmp-ble](https://github.com/gary-quinn/kmp-ble) 
 | **kmp-nfc** | `com.atruedev:kmp-nfc` | Core NFC - tag reading, NDEF read/write, raw transceive (ISO 7816-4 APDU), Host Card Emulation (Android) |
 | **kmp-nfc-testing** | `com.atruedev:kmp-nfc-testing` | Test doubles - `FakeNfcAdapter`, `FakeNfcTag`, `FakeHceService` with error injection and delay simulation |
 
+## Sample app
+
+Compose Multiplatform demo in [`sample/`](sample/). Android launcher: `:sample-android`. iOS wrapper: [`iosApp/`](iosApp/).
+
+```bash
+./gradlew :sample-android:installDebug
+```
+
+See [sample/README.md](sample/README.md) for screens, simulate mode, and the two-phone HCE walkthrough.
+
 ## Setup
 
 ### Android / KMP (Gradle)
