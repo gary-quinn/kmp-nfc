@@ -1,7 +1,13 @@
 package com.atruedev.kmpnfc.adapter
 
+import com.atruedev.kmpnfc.error.AdapterDisabled
+import com.atruedev.kmpnfc.error.AdapterError
+import com.atruedev.kmpnfc.error.NfcError
 import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.NotSupported
 import com.atruedev.kmpnfc.error.SessionInvalidated
+import com.atruedev.kmpnfc.error.SessionInvalidationReason
+import com.atruedev.kmpnfc.error.Unauthorized
 import com.atruedev.kmpnfc.reader.IosNfcTag
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.reader.ReaderOptions
@@ -14,10 +20,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
+import platform.CoreNFC.NFCErrorDomain
 import platform.CoreNFC.NFCNDEFReaderSession
 import platform.CoreNFC.NFCPollingISO14443
 import platform.CoreNFC.NFCPollingISO15693
 import platform.CoreNFC.NFCPollingISO18092
+import platform.CoreNFC.NFCReaderErrorRadioDisabled
+import platform.CoreNFC.NFCReaderErrorSecurityViolation
+import platform.CoreNFC.NFCReaderErrorUnsupportedFeature
+import platform.CoreNFC.NFCReaderSessionInvalidationErrorSessionTimeout
+import platform.CoreNFC.NFCReaderSessionInvalidationErrorSystemIsBusy
+import platform.CoreNFC.NFCReaderSessionInvalidationErrorUserCanceled
 import platform.CoreNFC.NFCTagReaderSession
 import platform.CoreNFC.NFCTagReaderSessionDelegateProtocol
 import platform.Foundation.NSClassFromString
@@ -70,14 +83,7 @@ internal class IosNfcAdapter : NfcAdapter {
                         session: NFCTagReaderSession,
                         didInvalidateWithError: NSError,
                     ) {
-                        close(
-                            NfcException(
-                                SessionInvalidated(
-                                    message = didInvalidateWithError.localizedDescription,
-                                    cause = Exception(didInvalidateWithError.localizedDescription),
-                                ),
-                            ),
-                        )
+                        close(NfcException(mapReaderError(didInvalidateWithError)))
                     }
 
                     override fun tagReaderSessionDidBecomeActive(session: NFCTagReaderSession) = Unit
@@ -135,5 +141,60 @@ internal class IosNfcAdapter : NfcAdapter {
         )
     }
 }
+
+/**
+ * Recognizes the Core NFC errors that describe the adapter or the session as a whole rather than
+ * the operation in flight, or `null` when the error belongs to the operation.
+ *
+ * These can arrive through *any* Core NFC callback, not just session invalidation - a missing
+ * entitlement, for instance, is reported by `connectToTag` as `NFCErrorDomain` code 2 long after
+ * the session opened successfully. Callers should prefer this over their own fallback so that a
+ * broken session is not reported as, say, a lost tag.
+ *
+ * Unsupported hardware, a disabled radio, and a missing entitlement become the same
+ * [NotSupported] / [AdapterDisabled] / [Unauthorized] errors that `AndroidNfcAdapter` throws
+ * eagerly when collection starts. iOS can only learn about them by attempting a session, so they
+ * arrive here instead of being resolvable up front from adapter state.
+ */
+internal fun adapterErrorOrNull(error: NSError): AdapterError? {
+    if (error.domain != NFCErrorDomain) return null
+    val cause = Exception(error.localizedDescription)
+    return when (error.code) {
+        NFCReaderErrorUnsupportedFeature -> NotSupported(cause = cause)
+        NFCReaderErrorRadioDisabled -> AdapterDisabled(cause = cause)
+        NFCReaderErrorSecurityViolation -> Unauthorized(cause = cause)
+        NFCReaderSessionInvalidationErrorUserCanceled ->
+            SessionInvalidated(
+                message = error.localizedDescription,
+                reason = SessionInvalidationReason.USER_CANCELED,
+                cause = cause,
+            )
+        NFCReaderSessionInvalidationErrorSessionTimeout ->
+            SessionInvalidated(
+                message = error.localizedDescription,
+                reason = SessionInvalidationReason.SESSION_TIMEOUT,
+                cause = cause,
+            )
+        NFCReaderSessionInvalidationErrorSystemIsBusy ->
+            SessionInvalidated(
+                message = error.localizedDescription,
+                reason = SessionInvalidationReason.SYSTEM_BUSY,
+                cause = cause,
+            )
+        else -> null
+    }
+}
+
+/**
+ * Maps a Core NFC `NFCTagReaderSessionDelegate.didInvalidateWithError` [NSError] to the
+ * [NfcError] it represents, falling back to an unattributed [SessionInvalidated] for codes that
+ * [adapterErrorOrNull] does not recognize.
+ */
+internal fun mapReaderError(error: NSError): NfcError =
+    adapterErrorOrNull(error)
+        ?: SessionInvalidated(
+            message = error.localizedDescription,
+            cause = Exception(error.localizedDescription),
+        )
 
 public actual fun NfcAdapter(): NfcAdapter = IosNfcAdapter()

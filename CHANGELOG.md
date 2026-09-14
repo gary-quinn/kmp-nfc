@@ -17,12 +17,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `NfcCapabilities.canHostCardEmulation` capability flag
 - `ApduResponse.generalError()` (SW 6F00) for malformed inbound APDUs
 - Architecture doc: [docs/HCE-ARCHITECTURE.md](docs/HCE-ARCHITECTURE.md)
+- `SessionInvalidationReason` and `SessionInvalidated.reason`: iOS reader-session invalidations now
+  report *why* the session ended (`USER_CANCELED`, `SESSION_TIMEOUT`, `SYSTEM_BUSY`, `UNKNOWN`), so
+  a person dismissing the system NFC sheet is distinguishable from a genuine read failure without
+  string-matching `localizedDescription`
+- `FakeNfcAdapter.simulateSessionInvalidated()` to drive that path from tests
+- `IosNfcMappingsTest` covering the Core NFC `NSError` mapping
 
 ### Changed
 - HCE: serialize APDU handling with `limitedParallelism(1)`; propagate processor exceptions to `start()`
 - HCE: `canPaymentCategory` reflects default Tap & Pay wallet status, not a hardcoded `true`
 - HCE: invalid inbound APDUs return `6F00` instead of silent `null`
 - Trimmed `HCE-ARCHITECTURE.md` to match implementation scope
+- iOS: `NFCReaderErrorUnsupportedFeature`, `NFCReaderErrorRadioDisabled`, and
+  `NFCReaderErrorSecurityViolation` now surface as `NotSupported`, `AdapterDisabled`, and
+  `Unauthorized` - the same errors `AndroidNfcAdapter` throws eagerly for those conditions -
+  instead of collapsing into a generic `SessionInvalidated`
+
+### Fixed
+- iOS: session-wide failures reaching a per-operation callback are no longer misattributed to the
+  tag. `IosNfcTag` mapped every `NSError` to a fixed per-call type, so a signed build missing the
+  `com.apple.developer.nfc.readersession.formats` entitlement reported `NFCErrorDomain` code 2
+  from `connectToTag` as `TagLost` ("Tag connection lost"), sending readers after a hardware
+  problem that did not exist. `connectToTag`, `queryNDEFStatus`, `readNDEF`, `writeNDEF`, and both
+  transceive paths now prefer an adapter-level attribution and fall back to their own
+  `TagLost`/`NdefFormatError`/`TransceiveError` only for genuine tag failures
 
 ### Removed
 - `HceConfig.requireDeviceUnlock` and `HceConfig.description` (were not wired on Android)

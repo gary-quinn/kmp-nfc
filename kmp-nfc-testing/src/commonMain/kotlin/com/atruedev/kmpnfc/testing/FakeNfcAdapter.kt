@@ -3,6 +3,9 @@ package com.atruedev.kmpnfc.testing
 import com.atruedev.kmpnfc.adapter.NfcAdapter
 import com.atruedev.kmpnfc.adapter.NfcAdapterState
 import com.atruedev.kmpnfc.adapter.NfcCapabilities
+import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.SessionInvalidated
+import com.atruedev.kmpnfc.error.SessionInvalidationReason
 import com.atruedev.kmpnfc.reader.NfcTag
 import com.atruedev.kmpnfc.reader.ReaderOptions
 import com.atruedev.kmpnfc.tag.TagType
@@ -11,6 +14,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 
 /**
  * Test double for [NfcAdapter] that allows controlling state, capabilities,
@@ -35,12 +40,24 @@ public class FakeNfcAdapter(
     override val state: StateFlow<NfcAdapterState> = _state.asStateFlow()
 
     private val tagFlow = MutableSharedFlow<NfcTag>(extraBufferCapacity = 16)
+    private val sessionErrors = MutableSharedFlow<NfcException>(extraBufferCapacity = 1)
 
-    override fun tags(options: ReaderOptions): Flow<NfcTag> = tagFlow
+    override fun tags(options: ReaderOptions): Flow<NfcTag> = merge(tagFlow, sessionErrors.map { throw it })
 
     /** Emit a tag to all active collectors of [tags]. */
     public suspend fun emitTag(tag: NfcTag) {
         tagFlow.emit(tag)
+    }
+
+    /**
+     * Fail all active collectors of [tags] with a [SessionInvalidated] error, mirroring an iOS
+     * `NFCTagReaderSession` invalidation (user cancel, timeout, or system-busy).
+     */
+    public suspend fun simulateSessionInvalidated(
+        reason: SessionInvalidationReason,
+        message: String = "Session invalidated: $reason",
+    ) {
+        sessionErrors.emit(NfcException(SessionInvalidated(message = message, reason = reason)))
     }
 
     /** Transition adapter to [NfcAdapterState.OFF]. */
