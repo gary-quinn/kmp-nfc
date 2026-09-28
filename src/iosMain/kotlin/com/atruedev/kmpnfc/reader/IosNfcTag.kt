@@ -1,5 +1,8 @@
 package com.atruedev.kmpnfc.reader
 
+import com.atruedev.kmpnfc.adapter.adapterErrorOrNull
+import com.atruedev.kmpnfc.error.NdefFormatError
+import com.atruedev.kmpnfc.error.NfcError
 import com.atruedev.kmpnfc.error.NfcException
 import com.atruedev.kmpnfc.error.ReadOnly
 import com.atruedev.kmpnfc.error.TagLost
@@ -111,7 +114,7 @@ internal class IosNfcTag(
         suspendCoroutine { cont ->
             session.connectToTag(tag) { error ->
                 if (error != null) {
-                    cont.resumeWithException(NfcException(TagLost(cause = error.toException())))
+                    cont.resumeWithException(error.toNfcException { TagLost(cause = it) })
                 } else {
                     connected = true
                     cont.resume(Unit)
@@ -162,9 +165,9 @@ internal class IosNfcTag(
             ndef.queryNDEFStatusWithCompletionHandler { status, _, error ->
                 if (error != null) {
                     cont.resumeWithException(
-                        NfcException(
-                            TransceiveError(message = error.localizedDescription, cause = error.toException()),
-                        ),
+                        error.toNfcException {
+                            TransceiveError(message = error.localizedDescription, cause = it)
+                        },
                     )
                 } else {
                     cont.resume(status)
@@ -177,12 +180,9 @@ internal class IosNfcTag(
             ndef.readNDEFWithCompletionHandler { ndefMessage, error ->
                 if (error != null) {
                     cont.resumeWithException(
-                        NfcException(
-                            com.atruedev.kmpnfc.error.NdefFormatError(
-                                message = error.localizedDescription,
-                                cause = error.toException(),
-                            ),
-                        ),
+                        error.toNfcException {
+                            NdefFormatError(message = error.localizedDescription, cause = it)
+                        },
                     )
                 } else {
                     cont.resume(ndefMessage?.toKmpNdefMessage())
@@ -198,12 +198,9 @@ internal class IosNfcTag(
             ndef.writeNDEF(message.toIosNdefMessage()) { error ->
                 if (error != null) {
                     cont.resumeWithException(
-                        NfcException(
-                            com.atruedev.kmpnfc.error.NdefFormatError(
-                                message = error.localizedDescription,
-                                cause = error.toException(),
-                            ),
-                        ),
+                        error.toNfcException {
+                            NdefFormatError(message = error.localizedDescription, cause = it)
+                        },
                     )
                 } else {
                     cont.resume(Unit)
@@ -222,9 +219,9 @@ internal class IosNfcTag(
             ) { responseData, sw1, sw2, error ->
                 if (error != null) {
                     cont.resumeWithException(
-                        NfcException(
-                            TransceiveError(message = error.localizedDescription, cause = error.toException()),
-                        ),
+                        error.toNfcException {
+                            TransceiveError(message = error.localizedDescription, cause = it)
+                        },
                     )
                 } else {
                     val response = responseData?.toByteArray() ?: byteArrayOf()
@@ -242,9 +239,9 @@ internal class IosNfcTag(
             mifareRef.sendMiFareCommand(data.toNSData()) { responseData, error ->
                 if (error != null) {
                     cont.resumeWithException(
-                        NfcException(
-                            TransceiveError(message = error.localizedDescription, cause = error.toException()),
-                        ),
+                        error.toNfcException {
+                            TransceiveError(message = error.localizedDescription, cause = it)
+                        },
                     )
                 } else {
                     cont.resume(responseData?.toByteArray() ?: byteArrayOf())
@@ -254,6 +251,18 @@ internal class IosNfcTag(
 }
 
 private fun NSError.toException(): Exception = Exception(localizedDescription)
+
+/**
+ * Wraps this Core NFC error, preferring an adapter- or session-level attribution over [fallback].
+ *
+ * Core NFC reports failures that have nothing to do with the tag - a missing entitlement, a
+ * disabled radio, an invalidated session - through the same per-operation completion handlers as
+ * genuine tag errors. Without this, a signed build missing
+ * `com.apple.developer.nfc.readersession.formats` reports "Tag connection lost" from
+ * `connectToTag`, which sends the reader hunting for a hardware problem that does not exist.
+ */
+private fun NSError.toNfcException(fallback: (Throwable) -> NfcError): NfcException =
+    NfcException(adapterErrorOrNull(this) ?: fallback(toException()))
 
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private fun ByteArray.toNSData(): NSData =

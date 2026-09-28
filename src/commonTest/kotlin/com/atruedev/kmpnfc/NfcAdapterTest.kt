@@ -3,6 +3,9 @@ package com.atruedev.kmpnfc
 import app.cash.turbine.test
 import com.atruedev.kmpnfc.adapter.NfcAdapterState
 import com.atruedev.kmpnfc.adapter.NfcCapabilities
+import com.atruedev.kmpnfc.error.NfcException
+import com.atruedev.kmpnfc.error.SessionInvalidated
+import com.atruedev.kmpnfc.error.SessionInvalidationReason
 import com.atruedev.kmpnfc.tag.TagType
 import com.atruedev.kmpnfc.testing.FakeNfcAdapter
 import com.atruedev.kmpnfc.testing.FakeNfcTag
@@ -10,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class NfcAdapterTest {
@@ -113,6 +117,33 @@ class NfcAdapterTest {
                 val tag = awaitItem()
                 assertEquals(fakeTag, tag)
                 cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun simulateSessionInvalidatedUserCanceledFailsCollectorsWithReason() =
+        runTest {
+            val adapter = FakeNfcAdapter()
+
+            adapter.tags().test {
+                adapter.simulateSessionInvalidated(SessionInvalidationReason.USER_CANCELED)
+                val error = awaitError()
+                val nfcException = assertIs<NfcException>(error)
+                val sessionInvalidated = assertIs<SessionInvalidated>(nfcException.error)
+                assertEquals(SessionInvalidationReason.USER_CANCELED, sessionInvalidated.reason)
+            }
+        }
+
+    @Test
+    fun simulateSessionInvalidatedDistinguishesTimeoutFromUserCancel() =
+        runTest {
+            val adapter = FakeNfcAdapter()
+
+            adapter.tags().test {
+                adapter.simulateSessionInvalidated(SessionInvalidationReason.SESSION_TIMEOUT)
+                val sessionInvalidated =
+                    assertIs<SessionInvalidated>(assertIs<NfcException>(awaitError()).error)
+                assertEquals(SessionInvalidationReason.SESSION_TIMEOUT, sessionInvalidated.reason)
             }
         }
 

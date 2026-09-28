@@ -65,7 +65,7 @@ Core NFC requires a modal `NFCTagReaderSession` - the system displays an NFC rea
 
 `IosNfcTag.ensureConnected()` handles lazy connection - connects on first operation, no-ops on subsequent calls. The `connected` flag is safe because all access is serialized through `tagDispatcher`.
 
-When the session invalidates (timeout, user dismissal, system event), the delegate calls `close(NfcException(SessionInvalidated(...)))` so flow collectors receive the reason.
+When the session invalidates (timeout, user dismissal, system event, or a startup failure such as unsupported hardware or a missing entitlement), the delegate calls `close(NfcException(mapReaderError(...)))`. `mapReaderError` decodes the underlying `NFCErrorDomain` code: `NFCReaderErrorUnsupportedFeature`/`RadioDisabled`/`SecurityViolation` become the same dedicated `NotSupported`/`AdapterDisabled`/`Unauthorized` errors `AndroidNfcAdapter` throws eagerly before opening a session (iOS can only detect these by attempting one), while `NFCReaderSessionInvalidationErrorUserCanceled`/`SessionTimeout`/`SystemIsBusy` become a `SessionInvalidated` with a matching `SessionInvalidationReason`, so collectors can tell a user-initiated cancel (`USER_CANCELED`) apart from a real failure instead of treating every invalidation as one generic error.
 
 ---
 

@@ -33,7 +33,17 @@ public data class AdapterDisabled(
     override val cause: Throwable? = null,
 ) : AdapterError
 
-/** User denied NFC permission. */
+/**
+ * NFC access denied.
+ *
+ * On iOS this is thrown from [com.atruedev.kmpnfc.adapter.NfcAdapter.tags] when the app is
+ * missing the required entitlement or privacy permission (`NFCReaderErrorSecurityViolation`).
+ * Core NFC only reports it once a session is attempted, so it cannot be predicted up front as an
+ * [com.atruedev.kmpnfc.adapter.NfcAdapterState].
+ *
+ * On Android it is thrown only from HCE AID registration; ordinary NFC reading has no revocable
+ * runtime permission to deny.
+ */
 public data class Unauthorized(
     override val message: String = "NFC permission not granted",
     override val cause: Throwable? = null,
@@ -82,10 +92,26 @@ public data class InsufficientSpace(
     override val cause: Throwable? = null,
 ) : TagOperationError
 
+/** Why an iOS reader session was invalidated. */
+public enum class SessionInvalidationReason {
+    /** The person using the app dismissed the system NFC sheet - not a failure. */
+    USER_CANCELED,
+
+    /** Core NFC ended the session on its own after roughly 60 seconds without a read. */
+    SESSION_TIMEOUT,
+
+    /** Core NFC was temporarily unavailable due to system resource constraints. */
+    SYSTEM_BUSY,
+
+    /** Any other invalidation, including errors outside `NFCErrorDomain`. */
+    UNKNOWN,
+}
+
 /** iOS reader session invalidated by system (timeout, user dismissal, or system event). */
 public data class SessionInvalidated(
     override val message: String,
     override val cause: Throwable? = null,
+    val reason: SessionInvalidationReason = SessionInvalidationReason.UNKNOWN,
 ) : AdapterError
 
 /** Operation timed out. */
