@@ -11,6 +11,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_Changes on `main` that have not yet been tagged for release._
+
+---
+
+## [0.0.6] - 2026-10-03
+
+### Added
+- feat: add Host Card Emulation (HCE) support
+- feat: suface iOS NFC error attribution
+
+### Changed
+- build(dependabot): bump com.android.kotlin.multiplatform.library from 9.2.1 to 9.3.1
+- ci(dependabot): bump actions/checkout from 7.0.0 to 7.0.1
+- ci(dependabot): bump actions/setup-java from 5.6.0 to 5.7.0
+- ci(dependabot): bump gradle/actions/setup-gradle from 6.2.0 to 6.3.0
+- build(dependabot): bump gradle-wrapper from 9.6.1 to 9.7.0
+- build(dependabot): bump gradle-wrapper from 9.7.0 to 9.7.1
+- build(dependabot): bump com.android.kotlin.multiplatform.library from 9.3.1 to 9.3.2
+- ci(dependabot): bump actions/setup-java from 5.7.0 to 6.0.0
+- ci(dependabot): bump actions/deploy-pages from 5.0.0 to 5.0.1
+- build(dependabot): bump kotlin from 2.4.10 to 2.4.20
+- ci(dependabot): bump actions/setup-java from 6.0.0 to 6.0.1
+- build(dependabot): bump com.android.kotlin.multiplatform.library from 9.3.2 to 9.4.1
+- build(dependabot): bump androidx.core:core-ktx from 1.19.0 to 1.19.1
+
 ### Added
 - feat: Host Card Emulation (HCE) on Android via `HceService` API
 - `FakeHceService` test double in kmp-nfc-testing
@@ -121,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.6...HEAD
+[0.0.6]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/gary-quinn/kmp-nfc/compare/v0.0.2...v0.0.3
